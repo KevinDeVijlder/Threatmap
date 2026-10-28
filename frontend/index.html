@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOC Threat Matrix // 2D Vector Map</title>
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- D3 Geo & TopoJSON -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+</head>
+<body>
+  <!-- Top Telemetry Header -->
+  <header class="hud-header">
+    <div class="hud-brand">
+      <div class="status-indicator"></div>
+      <div class="brand-text">
+        <span class="system-title">THREAT_SENSOR // VECTOR_GRID</span>
+        <span class="system-sub">HARDWARE-ACCELERATED 2D SURFACE</span>
+      </div>
+    </div>
+    
+    <div class="hud-telemetry">
+      <div class="telemetry-block">
+        <span class="label">ENGINE</span>
+        <span class="value" id="hud-engine">SMOOTH_VEC</span>
+      </div>
+      <div class="telemetry-block">
+        <span class="label">TERRITORIES</span>
+        <span class="value" id="hud-territories">177</span>
+      </div>
+      <div class="telemetry-block">
+        <span class="label">UTC TIME</span>
+        <span class="value" id="hud-clock">00:00:00</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Left Tactical Intel Panel -->
+  <aside id="country-intel" class="intel-panel idle">
+    <div class="intel-header">
+      <span class="intel-tag">SECTOR INTELLIGENCE</span>
+      <span class="intel-status" id="intel-status">SCANNING...</span>
+    </div>
+
+    <div class="intel-identity">
+      <div class="flag-wrapper">
+        <img id="country-flag" class="country-flag" src="" alt="Flag" style="display: none;" />
+        <div id="flag-placeholder" class="flag-placeholder">?</div>
+      </div>
+      <div class="country-meta">
+        <h2 id="country-name" class="country-name">STANDBY</h2>
+        <span id="country-code" class="country-code">GEO // NONE</span>
+      </div>
+    </div>
+
+    <!-- Telemetry Cards -->
+    <div class="intel-stats-section">
+      <div class="section-title">TELEMETRY_FEED</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">BLOCKED EVENTS</span>
+          <span class="stat-val" id="stat-events">--</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">TOP TARGET PORT</span>
+          <span class="stat-val" id="stat-port">--</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">THREAT LEVEL</span>
+          <span class="stat-val stat-threat" id="stat-threat">MONITORING</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">PROTOCOL</span>
+          <span class="stat-val" id="stat-proto">--</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mouse Coordinate HUD -->
+  <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>
+  
+  <canvas id="threat-map"></canvas>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
