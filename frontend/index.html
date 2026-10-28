@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOC Threat Matrix // 2D Vector Map</title>
+  <title>SOC Threat Matrix // 2D Attack Map</title>
   <link rel="stylesheet" href="css/style.css">
   
   <!-- D3 Geo & TopoJSON -->
@@ -16,19 +16,24 @@
     <div class="hud-brand">
       <div class="status-indicator"></div>
       <div class="brand-text">
-        <span class="system-title">THREAT_SENSOR // VECTOR_GRID</span>
-        <span class="system-sub">HARDWARE-ACCELERATED 2D SURFACE</span>
+        <span class="system-title">THREAT_SENSOR // LIVE_SURFACE</span>
+        <span class="system-sub">BALLISTIC ATTACK TRAJECTORY ENGINE</span>
       </div>
     </div>
     
+    <div class="hud-controls">
+      <button id="btn-simulation" class="hud-btn active">SIMULATION: ON</button>
+      <button id="btn-salvo" class="hud-btn highlight">⚡ TRIGGER SALVO</button>
+    </div>
+
     <div class="hud-telemetry">
       <div class="telemetry-block">
-        <span class="label">ENGINE</span>
-        <span class="value" id="hud-engine">SMOOTH_VEC</span>
+        <span class="label">TOTAL ATTACKS COUNTED</span>
+        <span class="value" id="hud-attacks-total">0</span>
       </div>
       <div class="telemetry-block">
-        <span class="label">TERRITORIES</span>
-        <span class="value" id="hud-territories">177</span>
+        <span class="label">ACTIVE ORIGINS</span>
+        <span class="value" id="hud-active-origins">0 REGIONS</span>
       </div>
       <div class="telemetry-block">
         <span class="label">UTC TIME</span>
@@ -37,47 +42,59 @@
     </div>
   </header>
 
-  <!-- Left Tactical Intel Panel -->
-  <aside id="country-intel" class="intel-panel idle">
-    <div class="intel-header">
-      <span class="intel-tag">SECTOR INTELLIGENCE</span>
-      <span class="intel-status" id="intel-status">SCANNING...</span>
-    </div>
+  <!-- Left Sidebar Column -->
+  <div class="sidebar-column left-column">
+    <!-- Block 1: Target Homelab Beacon & Hover Sector Intel -->
+    <aside id="country-intel" class="panel-card idle">
+      <div class="panel-header">
+        <span class="panel-tag">HOMELAB TARGET BEACON</span>
+        <span class="panel-status status-target">ACTIVE // BE_SOC_01</span>
+      </div>
 
-    <div class="intel-identity">
-      <div class="flag-wrapper">
-        <img id="country-flag" class="country-flag" src="" alt="Flag" style="display: none;" />
-        <div id="flag-placeholder" class="flag-placeholder">?</div>
+      <div class="target-card">
+        <div class="target-ping"></div>
+        <div class="target-meta">
+          <span class="target-name">DEFENSE GATEWAY // WAN</span>
+          <span class="target-coords">50.86° N, 4.63° E (BELGIUM)</span>
+        </div>
       </div>
-      <div class="country-meta">
-        <h2 id="country-name" class="country-name">STANDBY</h2>
-        <span id="country-code" class="country-code">GEO // NONE</span>
-      </div>
-    </div>
 
-    <!-- Telemetry Cards -->
-    <div class="intel-stats-section">
-      <div class="section-title">TELEMETRY_FEED</div>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-label">BLOCKED EVENTS</span>
-          <span class="stat-val" id="stat-events">--</span>
+      <div class="intel-identity">
+        <div class="flag-wrapper">
+          <img id="country-flag" class="country-flag" src="" alt="Flag" style="display: none;" />
+          <div id="flag-placeholder" class="flag-placeholder">?</div>
         </div>
-        <div class="stat-card">
-          <span class="stat-label">TOP TARGET PORT</span>
-          <span class="stat-val" id="stat-port">--</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">THREAT LEVEL</span>
-          <span class="stat-val stat-threat" id="stat-threat">MONITORING</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">PROTOCOL</span>
-          <span class="stat-val" id="stat-proto">--</span>
+        <div class="country-meta">
+          <h2 id="country-name" class="country-name">STANDBY</h2>
+          <span id="country-code" class="country-code">GEO // NONE</span>
         </div>
       </div>
-    </div>
-  </aside>
+    </aside>
+
+    <!-- Block 2: Separate Real-Time Intrusion Feed Card -->
+    <aside class="panel-card">
+      <div class="panel-header">
+        <span class="panel-tag">REAL-TIME INTRUSION FEED</span>
+        <span class="panel-status">LIVE STREAM</span>
+      </div>
+      <div id="attack-ticker" class="attack-ticker">
+        <div class="ticker-empty">LISTENING FOR INBOUND PACKETS...</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Right Sidebar Column: Top 10 Attacking Nations -->
+  <div class="sidebar-column right-column">
+    <aside class="panel-card">
+      <div class="panel-header">
+        <span class="panel-tag">TOP 10 ATTACKING NATIONS</span>
+        <span class="panel-status" id="leaderboard-total-hits">0 HITS</span>
+      </div>
+      <div id="leaderboard-list" class="leaderboard-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </aside>
+  </div>
 
   <!-- Mouse Coordinate HUD -->
   <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>

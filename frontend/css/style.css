@@ -1,11 +1,11 @@
 :root {
   --color-primary: #006FFF;              /* UniFi Electric Blue */
-  --color-primary-glow: rgba(0, 111, 255, 0.6);
+  --color-primary-glow: rgba(0, 111, 255, 0.65);
   --color-accent: #00F0FF;               /* Neon Cyan */
-  --color-land-base: #0b1424;            /* Dark Tactical Slate Navy */
-  --color-land-border: rgba(0, 111, 255, 0.22);
+  --color-land-base: #0b1424;            /* Dark Slate Base */
+  --color-land-border: rgba(0, 111, 255, 0.28);
   --color-bg: #030712;
-  --color-hud-bg: rgba(3, 7, 18, 0.85);
+  --color-hud-bg: rgba(3, 7, 18, 0.88);
   --color-border: rgba(0, 111, 255, 0.28);
   --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
 }
@@ -99,6 +99,48 @@ body::before {
   color: rgba(255, 255, 255, 0.45);
 }
 
+.hud-controls {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-btn {
+  background: var(--color-hud-bg);
+  border: 1px solid var(--color-border);
+  color: #cbd5e1;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.hud-btn:hover {
+  background: rgba(0, 111, 255, 0.2);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.hud-btn.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(0, 111, 255, 0.35);
+}
+
+.hud-btn.highlight {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.hud-btn.highlight:active {
+  transform: scale(0.96);
+}
+
 .hud-telemetry {
   display: flex;
   gap: 12px;
@@ -128,29 +170,43 @@ body::before {
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
 
-/* Left Intel Panel */
-.intel-panel {
+/* Sidebar Columns (Left and Right) */
+.sidebar-column {
   position: absolute;
-  top: 90px;
+  top: 85px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.left-column {
   left: 20px;
-  width: 310px;
+}
+
+.right-column {
+  right: 20px;
+}
+
+/* Modular Panel Cards */
+.panel-card {
   background: var(--color-hud-bg);
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-primary);
   border-radius: 4px;
-  padding: 16px;
-  z-index: 20;
-  pointer-events: none;
+  padding: 14px;
   backdrop-filter: blur(12px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.intel-panel.active {
+.panel-card.active {
   border-color: rgba(0, 111, 255, 0.6);
   box-shadow: 0 0 25px rgba(0, 111, 255, 0.2);
 }
 
-.intel-header {
+.panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -158,28 +214,66 @@ body::before {
   letter-spacing: 0.08em;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
-.intel-tag {
+.panel-tag {
   color: rgba(255, 255, 255, 0.5);
 }
 
-.intel-status {
-  color: rgba(255, 255, 255, 0.45);
+.panel-status {
+  color: var(--color-primary);
   font-weight: 600;
 }
 
-.intel-panel.active .intel-status {
+.status-target {
   color: var(--color-primary);
+  font-weight: 700;
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
 
+/* Target Homelab Card */
+.target-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 111, 255, 0.08);
+  border: 1px solid rgba(0, 111, 255, 0.25);
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.target-ping {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary);
+  animation: pulse 1.5s infinite;
+}
+
+.target-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.target-name {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.target-coords {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Country Meta on Hover */
 .intel-identity {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 18px;
 }
 
 .flag-wrapper {
@@ -222,7 +316,7 @@ body::before {
   max-width: 200px;
 }
 
-.intel-panel.active .country-name {
+.panel-card.active .country-name {
   color: var(--color-primary);
   text-shadow: 0 0 10px var(--color-primary-glow);
 }
@@ -233,48 +327,135 @@ body::before {
   letter-spacing: 0.08em;
 }
 
-.intel-stats-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+/* Attack Ticker Feed */
+.attack-ticker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 230px;
+  overflow: hidden;
 }
 
-.section-title {
-  font-size: 0.55rem;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
+.ticker-empty {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 10px 0;
+  text-align: center;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.ticker-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 8px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  animation: slideIn 0.25s ease-out;
+}
+
+.ticker-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ticker-badge {
+  font-size: 0.5rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(0, 111, 255, 0.18);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.ticker-origin {
+  color: #fff;
+  font-weight: 600;
+}
+
+.ticker-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ticker-port {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Top 10 Attacking Nations Leaderboard */
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.leaderboard-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+
+.leaderboard-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leaderboard-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.stat-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 8px 10px;
-  border-radius: 3px;
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-label {
-  font-size: 0.5rem;
-  color: rgba(255, 255, 255, 0.38);
-  letter-spacing: 0.05em;
-  margin-bottom: 3px;
-}
-
-.stat-val {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #cbd5e1;
-}
-
-.intel-panel.active .stat-val.stat-threat {
+.leaderboard-rank {
+  font-size: 0.55rem;
   color: var(--color-primary);
+  font-weight: 700;
+  min-width: 16px;
+}
+
+.leaderboard-flag {
+  width: 18px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 1px;
+}
+
+.leaderboard-name {
+  font-size: 0.65rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.leaderboard-hits {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.leaderboard-bar-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.leaderboard-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  box-shadow: 0 0 6px var(--color-primary);
+  transition: width 0.3s ease;
 }
 
 /* Mouse Coordinate HUD */
@@ -296,4 +477,9 @@ body::before {
 @keyframes pulse {
   0%, 100% { opacity: 0.35; transform: scale(0.9); }
   50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 14px var(--color-primary); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
