@@ -18,7 +18,7 @@
 ### Overview
 **Threat map** is a dark-themed, tactical 2D cyber threat map built for Security Operations Center (SOC) wallboards, homelab displays, and public threat monitoring. 
 
-Unlike static mockups or synthetic "pew-pew" toys, this application ingests **live, unauthenticated Open-Source Intelligence (OSINT)** from **abuse.ch Feodo Tracker** and **ThreatFox**, geolocates active Botnet Command & Control (C2) servers and malware distribution hosts, and streams real-time ballistic trajectory arcs to connected browsers over WebSockets.
+Unlike static mockups, this application ingests **live, unauthenticated Open-Source Intelligence (OSINT)** from **abuse.ch Feodo Tracker** and **ThreatFox**, geolocates active Botnet Command & Control (C2) servers and malware distribution hosts, and streams real-time ballistic trajectory arcs to connected browsers over WebSockets.
 
 ---
 

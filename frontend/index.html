@@ -6,12 +6,16 @@
   <title>SOC Threat Matrix // Global OSINT Map</title>
   <link rel="stylesheet" href="css/style.css">
   
-  <!-- D3 Geo & TopoJSON -->
+  <!-- External Cartography Libraries: D3.js (Geo Projections) & TopoJSON Client -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 </head>
 <body>
-  <!-- Top Telemetry Header -->
+  <!-- =================================================================
+       TOP TELEMETRY HEADER
+       Displays connection status, live badge, total attack counter,
+       active origin regions count, and live UTC clock.
+       ================================================================= -->
   <header class="hud-header">
     <div class="hud-brand">
       <div id="conn-status" class="status-indicator"></div>
@@ -41,8 +45,14 @@
     </div>
   </header>
 
-  <!-- Left Sidebar Column -->
+  <!-- =================================================================
+       LEFT SIDEBAR COLUMN (320px wide)
+       Contains two stacked cards:
+       1. Global Threat Sensor Grid + Hovered Country Flag/ISO Intel
+       2. Real-Time Intrusion Feed (scrolling ticker of the latest 5 hits)
+       ================================================================= -->
   <div class="sidebar-column left-column">
+    <!-- Card 1: Sensor Grid & Hovered Country Identity -->
     <aside id="country-intel" class="panel-card idle">
       <div class="panel-header">
         <span class="panel-tag">GLOBAL THREAT SENSOR GRID</span>
@@ -69,6 +79,7 @@
       </div>
     </aside>
 
+    <!-- Card 2: Real-Time Intrusion Feed -->
     <aside class="panel-card">
       <div class="panel-header">
         <span class="panel-tag">REAL-TIME INTRUSION FEED</span>
@@ -80,7 +91,10 @@
     </aside>
   </div>
 
-  <!-- Right Sidebar Column -->
+  <!-- =================================================================
+       RIGHT SIDEBAR COLUMN (320px wide)
+       Displays the Top 10 Attacking Nations leaderboard sorted by hits.
+       ================================================================= -->
   <div class="sidebar-column right-column">
     <aside class="panel-card">
       <div class="panel-header">
@@ -88,14 +102,15 @@
         <span class="panel-status" id="leaderboard-total-hits">0 HITS</span>
       </div>
       <div id="leaderboard-list" class="leaderboard-list">
-        <!-- Rendered dynamically -->
+        <!-- Populated dynamically by updateLeaderboard() in main.js -->
       </div>
     </aside>
   </div>
 
-  <!-- Mouse Coordinate HUD -->
+  <!-- Bottom-Left Cursor Coordinate Reticle -->
   <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>
   
+  <!-- Full-Viewport HTML5 Render Canvas -->
   <canvas id="threat-map"></canvas>
 
   <script src="js/main.js"></script>

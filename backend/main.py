@@ -1,9 +1,11 @@
 """
-SOC Threat Matrix - OSINT Ingestion & WebSocket Streamer
-Pulls real-time botnet C2 and malware indicators from unauthenticated public OSINT feeds:
-1. abuse.ch Feodo Tracker (ipblocklist.json)
-2. abuse.ch ThreatFox Public Export (export/json/recent)
-Enriches IPs with real geographic coordinates and streams ballistic events over WebSockets.
+SOC Threat Matrix - OSINT Ingestion & WebSocket Server
+======================================================
+Architecture Overview:
+1. Polls unauthenticated public threat intelligence feeds (abuse.ch Feodo Tracker & ThreatFox).
+2. Resolves raw attacker IP addresses into real-world Latitude/Longitude coordinates via batch GeoIP.
+3. Streams formatted JSON attack events over WebSockets (/ws) to all connected browser clients.
+4. Serves the static frontend dashboard at the root URL (/).
 """
 
 import asyncio
@@ -18,10 +20,18 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+# Configure console logging with timestamps
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("OSINT_ENGINE")
 
-# Representative Global Sensor / Target Nodes
+
+# =====================================================================
+# STATIC GEOGRAPHIC REFERENCE DATA
+# =====================================================================
+
+# Global Sensor / Victim Target Nodes:
+# Public OSINT feeds provide the attacker/C2 IP (the source). To visualize a complete
+# connection path, we pair each threat indicator with a global sensor/victim node.
 GLOBAL_SENSOR_NODES = [
     {"country": "United States", "code": "us", "lat": 37.77, "lon": -122.41},
     {"country": "United States", "code": "us", "lat": 39.04, "lon": -77.48},
@@ -39,7 +49,8 @@ GLOBAL_SENSOR_NODES = [
     {"country": "South Korea", "code": "kr", "lat": 37.56, "lon": 126.97},
 ]
 
-# Country-level coordinate lookup fallback
+# Country Centroid Fallback Dictionary:
+# Used if batch IP geolocation hits a rate limit or if only a 2-letter ISO country code is available.
 COUNTRY_COORDS = {
     "CN": {"country": "China", "lat": 39.9, "lon": 116.4},
     "US": {"country": "United States", "lat": 37.7, "lon": -95.7},
@@ -72,21 +83,36 @@ COUNTRY_COORDS = {
 }
 
 
+# =====================================================================
+# WEBSOCKET CONNECTION MANAGER
+# =====================================================================
+
 class ConnectionManager:
+    """
+    Manages active WebSocket connections from browser clients.
+    Handles client registration, disconnection cleanup, and broadcasting JSON payloads.
+    """
+
     def __init__(self):
         self.active_connections: List[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
+        """Accepts a new incoming WebSocket handshake and stores the client reference."""
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info(f"Client connected. Active listeners: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
+        """Removes a closed or broken WebSocket connection from the active pool."""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
             logger.info(f"Client disconnected. Active listeners: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict):
+        """
+        Serializes an attack dictionary to JSON and pushes it to every connected browser.
+        Automatically prunes dead connections if sending fails.
+        """
         if not self.active_connections:
             return
         payload = json.dumps(message)
@@ -100,17 +126,22 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+# =====================================================================
+# OSINT THREAT COLLECTOR & GEOLOCATION FUNCTIONS
+# =====================================================================
+
 async def fetch_public_osint_pool() -> List[Dict]:
     """
-    Pulls real-time indicators from unauthenticated public JSON feeds:
-    1. Feodo Tracker C2 IP Blocklist
-    2. ThreatFox Public Recent JSON Export
+    Downloads live indicators of compromise (IOCs) from two unauthenticated abuse.ch feeds:
+      1. Feodo Tracker: Active Botnet Command & Control (C2) servers (Emotet, QakBot, Pikabot).
+      2. ThreatFox Export: Recently reported malicious IP:Port pairs.
+    Then performs a batch geolocation request to resolve the IPs into city-level Lat/Lon coordinates.
     """
     pool: List[Dict] = []
     headers = {"User-Agent": "SOC-ThreatMap-OSINT/1.0"}
 
     async with httpx.AsyncClient(timeout=12.0, headers=headers, follow_redirects=True) as client:
-        # 1. Fetch Feodo Tracker (Botnet Command & Control servers)
+        # --- Feed 1: abuse.ch Feodo Tracker (Botnet C2 IP Blocklist) ---
         try:
             resp = await client.get("https://feodotracker.abuse.ch/downloads/ipblocklist.json")
             if resp.status_code == 200:
@@ -130,7 +161,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
         except Exception as e:
             logger.warning(f"Feodo Tracker fetch warning: {e}")
 
-        # 2. Fetch ThreatFox Public Export (No API Key Required)
+        # --- Feed 2: abuse.ch ThreatFox Public JSON Export ---
         try:
             resp = await client.get("https://threatfox.abuse.ch/export/json/recent/")
             if resp.status_code == 200:
@@ -142,6 +173,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
                             continue
                         ioc_obj = items[0]
                         ioc_val = ioc_obj.get("ioc_value", "")
+                        # Filter specifically for network-level IP:Port indicators
                         if ioc_obj.get("ioc_type") == "ip:port" and ":" in ioc_val:
                             ip_part, port_part = ioc_val.split(":", 1)
                             malware = ioc_obj.get("malware_printable") or ioc_obj.get("threat_type") or "MALWARE_IOC"
@@ -158,7 +190,8 @@ async def fetch_public_osint_pool() -> List[Dict]:
         except Exception as e:
             logger.warning(f"ThreatFox public export fetch warning: {e}")
 
-        # 3. Enrich up to 100 unique IPs with real Lat/Lon via ip-api batch
+        # --- Step 3: Batch IP Geolocation Enrichment ---
+        # Queries up to 100 unique IPs in a single HTTP POST to avoid rate-limiting
         if pool:
             random.shuffle(pool)
             batch_slice = pool[:100]
@@ -171,6 +204,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
                         for g in geo_resp.json()
                         if g.get("status") == "success"
                     }
+                    # Attach resolved coordinates directly onto the pool items
                     for item in pool:
                         g = geo_map.get(item["ip"])
                         if g:
@@ -186,7 +220,12 @@ async def fetch_public_osint_pool() -> List[Dict]:
 
 
 async def osint_worker():
-    """Continuously streams OSINT threat events to connected WebSocket browsers."""
+    """
+    Infinite background task started when FastAPI boots.
+    - Refreshes the cached OSINT indicator pool every 10 minutes (600 seconds).
+    - Selects real indicators from the pool and broadcasts them to connected WebSocket clients
+      at a realistic visual cadence (every 0.8 to 1.8 seconds).
+    """
     logger.info("Starting OSINT Intelligence Collector...")
     ioc_pool: List[Dict] = []
     last_fetch_time = 0.0
@@ -194,23 +233,24 @@ async def osint_worker():
     while True:
         now = asyncio.get_event_loop().time()
 
-        # Refresh the OSINT pool every 10 minutes (600s) or if empty
+        # Refresh the OSINT pool if empty or older than 10 minutes
         if not ioc_pool or (now - last_fetch_time > 600):
             fresh_pool = await fetch_public_osint_pool()
             if fresh_pool:
                 ioc_pool = fresh_pool
                 last_fetch_time = now
             else:
-                # Wait 30s before retrying if offline
+                # If network fetch failed, wait 30 seconds before trying again
                 last_fetch_time = now - 570
 
         if ioc_pool:
             item = random.choice(ioc_pool)
 
-            # Use enriched coordinates if present, otherwise resolve via country code
+            # Use city-level coordinates if geolocated; otherwise fall back to country centroid
             if "srcLat" in item and "srcLon" in item:
                 src_country = item["srcCountry"]
                 src_code = item["srcCode"]
+                # Add tiny jitter (±0.25 deg) so multiple hits from the same city don't overlap 100%
                 src_lat = item["srcLat"] + (random.random() - 0.5) * 0.5
                 src_lon = item["srcLon"] + (random.random() - 0.5) * 0.5
             else:
@@ -223,7 +263,7 @@ async def osint_worker():
                 src_lat = ref["lat"] + (random.random() - 0.5) * 3.0
                 src_lon = ref["lon"] + (random.random() - 0.5) * 3.0
 
-            # Pick a distinct target sensor node
+            # Pair with a target sensor node in a different country
             targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != src_code]
             dst = random.choice(targets if targets else GLOBAL_SENSOR_NODES)
 
@@ -241,31 +281,21 @@ async def osint_worker():
                 "proto": "TCP",
             }
             await manager.broadcast(event)
-        else:
-            # Fallback if internet is unreachable
-            cc = random.choice(list(COUNTRY_COORDS.keys()))
-            ref = COUNTRY_COORDS[cc]
-            targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != cc.lower()]
-            dst = random.choice(targets)
-            await manager.broadcast({
-                "srcCountry": ref["country"],
-                "srcCode": cc.lower(),
-                "srcLat": ref["lat"],
-                "srcLon": ref["lon"],
-                "dstCountry": dst["country"],
-                "dstCode": dst["code"],
-                "dstLat": dst["lat"],
-                "dstLon": dst["lon"],
-                "name": "BOTNET_SCAN",
-                "port": 443,
-                "proto": "TCP",
-            })
 
+        # Wait between 0.8s and 1.8s before emitting the next event
         await asyncio.sleep(random.uniform(0.8, 1.8))
 
 
+# =====================================================================
+# FASTAPI LIFESPAN, ROUTES & STATIC FILE MOUNT
+# =====================================================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan manager: starts the background `osint_worker` task on server boot
+    and cleanly cancels it when Uvicorn shuts down.
+    """
     task = asyncio.create_task(osint_worker())
     yield
     task.cancel()
@@ -273,6 +303,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SOC Threat Matrix OSINT Server", lifespan=lifespan)
 
+# Enable CORS so the frontend can connect even if opened on a separate port
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -284,6 +315,10 @@ app.add_middleware(
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint (/ws) that browsers connect to.
+    Keeps the connection open until the user closes or refreshes the tab.
+    """
     await manager.connect(websocket)
     try:
         while True:
@@ -292,7 +327,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# Serve static frontend files
+# Mount the `frontend/` folder at `/` so visiting http://localhost:8000 serves index.html
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_path):
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")

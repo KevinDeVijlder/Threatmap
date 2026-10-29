@@ -1,15 +1,21 @@
+/* =====================================================================
+   GLOBAL DESIGN TOKENS & COLOR PALETTE
+   ===================================================================== */
 :root {
-  --color-primary: #006FFF;              /* UniFi Electric Blue */
+  --color-primary: #006FFF;              /* Primary UniFi Electric Blue */
   --color-primary-glow: rgba(0, 111, 255, 0.65);
-  --color-accent: #00F0FF;               /* Neon Cyan */
-  --color-land-base: #0b1424;            /* Dark Slate Base */
+  --color-accent: #00F0FF;               /* Neon Cyan Accent */
+  --color-land-base: #0b1424;            /* Dark Slate Landmass Fill */
   --color-land-border: rgba(0, 111, 255, 0.28);
-  --color-bg: #030712;
-  --color-hud-bg: rgba(3, 7, 18, 0.88);
+  --color-bg: #030712;                   /* Deep Cyberspace Background */
+  --color-hud-bg: rgba(3, 7, 18, 0.88);  /* Translucent Glassmorphic HUD Card Fill */
   --color-border: rgba(0, 111, 255, 0.28);
   --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
 }
 
+/* =====================================================================
+   BASE RESET & CRT SCANLINE OVERLAY
+   ===================================================================== */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -26,7 +32,7 @@ html, body {
   color: #e2e8f0;
 }
 
-/* CRT Scanlines */
+/* Subtle horizontal CRT scanlines across the entire viewport */
 body::before {
   content: " ";
   position: absolute;
@@ -38,6 +44,7 @@ body::before {
   opacity: 0.6;
 }
 
+/* Main interactive map canvas */
 #threat-map {
   position: absolute;
   top: 0;
@@ -49,7 +56,9 @@ body::before {
   cursor: crosshair;
 }
 
-/* Header */
+/* =====================================================================
+   TOP TELEMETRY HEADER
+   ===================================================================== */
 .hud-header {
   position: absolute;
   top: 16px;
@@ -99,46 +108,16 @@ body::before {
   color: rgba(255, 255, 255, 0.45);
 }
 
-.hud-controls {
-  display: flex;
-  gap: 8px;
-  pointer-events: auto;
-}
-
-.hud-btn {
-  background: var(--color-hud-bg);
-  border: 1px solid var(--color-border);
-  color: #cbd5e1;
-  font-family: var(--font-mono);
+.status-badge {
+  background: rgba(0, 111, 255, 0.12);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
   font-size: 0.65rem;
-  font-weight: 600;
-  padding: 8px 14px;
+  font-weight: 700;
+  padding: 6px 14px;
   border-radius: 4px;
-  cursor: pointer;
-  letter-spacing: 0.05em;
-  backdrop-filter: blur(8px);
-  transition: all 0.2s ease;
-}
-
-.hud-btn:hover {
-  background: rgba(0, 111, 255, 0.2);
-  border-color: var(--color-primary);
-  color: #fff;
-}
-
-.hud-btn.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  box-shadow: 0 0 10px rgba(0, 111, 255, 0.35);
-}
-
-.hud-btn.highlight {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.hud-btn.highlight:active {
-  transform: scale(0.96);
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 12px rgba(0, 111, 255, 0.25);
 }
 
 .hud-telemetry {
@@ -170,7 +149,9 @@ body::before {
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
 
-/* Sidebar Columns (Left and Right) */
+/* =====================================================================
+   SYMMETRICAL LEFT & RIGHT SIDEBAR COLUMNS
+   ===================================================================== */
 .sidebar-column {
   position: absolute;
   top: 85px;
@@ -182,15 +163,9 @@ body::before {
   pointer-events: none;
 }
 
-.left-column {
-  left: 20px;
-}
+.left-column { left: 20px; }
+.right-column { right: 20px; }
 
-.right-column {
-  right: 20px;
-}
-
-/* Modular Panel Cards */
 .panel-card {
   background: var(--color-hud-bg);
   border: 1px solid var(--color-border);
@@ -217,22 +192,17 @@ body::before {
   margin-bottom: 12px;
 }
 
-.panel-tag {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.panel-status {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
+.panel-tag { color: rgba(255, 255, 255, 0.5); }
+.panel-status { color: var(--color-primary); font-weight: 600; }
 .status-target {
   color: var(--color-primary);
   font-weight: 700;
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
 
-/* Target Homelab Card */
+/* =====================================================================
+   LEFT SIDEBAR: SENSOR INFO & HOVERED COUNTRY IDENTITY
+   ===================================================================== */
 .target-card {
   display: flex;
   align-items: center;
@@ -253,23 +223,10 @@ body::before {
   animation: pulse 1.5s infinite;
 }
 
-.target-meta {
-  display: flex;
-  flex-direction: column;
-}
+.target-meta { display: flex; flex-direction: column; }
+.target-name { font-size: 0.65rem; font-weight: 700; color: #fff; }
+.target-coords { font-size: 0.55rem; color: rgba(255, 255, 255, 0.5); }
 
-.target-name {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.target-coords {
-  font-size: 0.55rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* Country Meta on Hover */
 .intel-identity {
   display: flex;
   align-items: center;
@@ -288,22 +245,9 @@ body::before {
   overflow: hidden;
 }
 
-.country-flag {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.flag-placeholder {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.3);
-  font-weight: 700;
-}
-
-.country-meta {
-  display: flex;
-  flex-direction: column;
-}
+.country-flag { width: 100%; height: 100%; object-fit: cover; }
+.flag-placeholder { font-size: 0.85rem; color: rgba(255, 255, 255, 0.3); font-weight: 700; }
+.country-meta { display: flex; flex-direction: column; }
 
 .country-name {
   font-size: 1.05rem;
@@ -321,13 +265,11 @@ body::before {
   text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
-.country-code {
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.08em;
-}
+.country-code { font-size: 0.65rem; color: rgba(255, 255, 255, 0.4); letter-spacing: 0.08em; }
 
-/* Attack Ticker Feed */
+/* =====================================================================
+   LEFT SIDEBAR: REAL-TIME INTRUSION TICKER FEED
+   ===================================================================== */
 .attack-ticker {
   display: flex;
   flex-direction: column;
@@ -355,12 +297,7 @@ body::before {
   animation: slideIn 0.25s ease-out;
 }
 
-.ticker-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
+.ticker-left { display: flex; align-items: center; gap: 6px; }
 .ticker-badge {
   font-size: 0.5rem;
   font-weight: 700;
@@ -370,25 +307,13 @@ body::before {
   color: var(--color-primary);
   border: 1px solid var(--color-primary);
 }
+.ticker-origin { color: #fff; font-weight: 600; }
+.ticker-right { display: flex; align-items: center; gap: 6px; color: rgba(255, 255, 255, 0.5); }
+.ticker-port { color: var(--color-primary); font-weight: 600; }
 
-.ticker-origin {
-  color: #fff;
-  font-weight: 600;
-}
-
-.ticker-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.ticker-port {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-/* Top 10 Attacking Nations Leaderboard */
+/* =====================================================================
+   RIGHT SIDEBAR: TOP 10 ATTACKING NATIONS LEADERBOARD
+   ===================================================================== */
 .leaderboard-list {
   display: flex;
   flex-direction: column;
@@ -405,43 +330,12 @@ body::before {
   border-radius: 3px;
 }
 
-.leaderboard-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.leaderboard-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.leaderboard-rank {
-  font-size: 0.55rem;
-  color: var(--color-primary);
-  font-weight: 700;
-  min-width: 16px;
-}
-
-.leaderboard-flag {
-  width: 18px;
-  height: 12px;
-  object-fit: cover;
-  border-radius: 1px;
-}
-
-.leaderboard-name {
-  font-size: 0.65rem;
-  color: #fff;
-  font-weight: 600;
-}
-
-.leaderboard-hits {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--color-primary);
-}
+.leaderboard-main { display: flex; justify-content: space-between; align-items: center; }
+.leaderboard-left { display: flex; align-items: center; gap: 8px; }
+.leaderboard-rank { font-size: 0.55rem; color: var(--color-primary); font-weight: 700; min-width: 16px; }
+.leaderboard-flag { width: 18px; height: 12px; object-fit: cover; border-radius: 1px; }
+.leaderboard-name { font-size: 0.65rem; color: #fff; font-weight: 600; }
+.leaderboard-hits { font-size: 0.65rem; font-weight: 700; color: var(--color-primary); }
 
 .leaderboard-bar-track {
   width: 100%;
@@ -458,7 +352,9 @@ body::before {
   transition: width 0.3s ease;
 }
 
-/* Mouse Coordinate HUD */
+/* =====================================================================
+   BOTTOM-LEFT CURSOR COORDINATE RETICLE & KEYFRAMES
+   ===================================================================== */
 .coords-display {
   position: absolute;
   bottom: 20px;
