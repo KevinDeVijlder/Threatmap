@@ -6,16 +6,12 @@
   <title>SOC Threat Matrix // Global OSINT Map</title>
   <link rel="stylesheet" href="css/style.css">
   
-  <!-- External Cartography Libraries: D3.js (Geo Projections) & TopoJSON Client -->
+  <!-- D3 Geo & TopoJSON -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 </head>
 <body>
-  <!-- =================================================================
-       TOP TELEMETRY HEADER
-       Displays connection status, live badge, total attack counter,
-       active origin regions count, and live UTC clock.
-       ================================================================= -->
+  <!-- Top Telemetry Header -->
   <header class="hud-header">
     <div class="hud-brand">
       <div id="conn-status" class="status-indicator"></div>
@@ -45,56 +41,36 @@
     </div>
   </header>
 
-  <!-- =================================================================
-       LEFT SIDEBAR COLUMN (320px wide)
-       Contains two stacked cards:
-       1. Global Threat Sensor Grid + Hovered Country Flag/ISO Intel
-       2. Real-Time Intrusion Feed (scrolling ticker of the latest 5 hits)
-       ================================================================= -->
-  <div class="sidebar-column left-column">
-    <!-- Card 1: Sensor Grid & Hovered Country Identity -->
-    <aside id="country-intel" class="panel-card idle">
-      <div class="panel-header">
-        <span class="panel-tag">GLOBAL THREAT SENSOR GRID</span>
-        <span class="panel-status status-target">OPEN_INTEL // SYNCED</span>
-      </div>
-
-      <div class="target-card">
-        <div class="target-ping"></div>
-        <div class="target-meta">
-          <span class="target-name">OSINT TELEMETRY FEED</span>
-          <span class="target-coords">ABUSE.CH // THREATFOX & FEODO</span>
-        </div>
-      </div>
-
-      <div class="intel-identity">
+  <!-- Spacious Bottom-Left Command Deck (580px wide) -->
+  <aside class="bottom-left-deck">
+    <!-- Top Bar: Target Status + Hovered Country Identity & Reticle -->
+    <div id="country-intel" class="deck-intel-bar idle">
+      <div class="intel-left">
         <div class="flag-wrapper">
           <img id="country-flag" class="country-flag" src="" alt="Flag" style="display: none;" />
-          <div id="flag-placeholder" class="flag-placeholder">?</div>
+          <div id="flag-placeholder" class="flag-placeholder">🌐</div>
         </div>
-        <div class="country-meta">
-          <h2 id="country-name" class="country-name">STANDBY</h2>
-          <span id="country-code" class="country-code">GEO // NONE</span>
+        <div class="intel-meta">
+          <span id="country-name" class="intel-country">STANDBY // SENSORS ONLINE</span>
+          <span id="country-code" class="intel-code">ABUSE.CH FEED // REAL-TIME INTRUSIONS</span>
         </div>
       </div>
-    </aside>
+      <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>
+    </div>
 
-    <!-- Card 2: Real-Time Intrusion Feed -->
-    <aside class="panel-card">
-      <div class="panel-header">
-        <span class="panel-tag">REAL-TIME INTRUSION FEED</span>
-        <span class="panel-status">LIVE STREAM</span>
+    <!-- Main Section: Real-Time Intrusion Feed -->
+    <div class="deck-feed-card">
+      <div class="feed-header">
+        <span class="feed-tag">REAL-TIME INTRUSION FEED</span>
+        <span class="feed-status">ACCURATE CITY TELEMETRY</span>
       </div>
       <div id="attack-ticker" class="attack-ticker">
         <div class="ticker-empty">LISTENING FOR OSINT INTRUSIONS...</div>
       </div>
-    </aside>
-  </div>
+    </div>
+  </aside>
 
-  <!-- =================================================================
-       RIGHT SIDEBAR COLUMN (320px wide)
-       Displays the Top 10 Attacking Nations leaderboard sorted by hits.
-       ================================================================= -->
+  <!-- Right Sidebar: Top 10 Attacking Nations -->
   <div class="sidebar-column right-column">
     <aside class="panel-card">
       <div class="panel-header">
@@ -102,15 +78,11 @@
         <span class="panel-status" id="leaderboard-total-hits">0 HITS</span>
       </div>
       <div id="leaderboard-list" class="leaderboard-list">
-        <!-- Populated dynamically by updateLeaderboard() in main.js -->
+        <!-- Rendered dynamically -->
       </div>
     </aside>
   </div>
 
-  <!-- Bottom-Left Cursor Coordinate Reticle -->
-  <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>
-  
-  <!-- Full-Viewport HTML5 Render Canvas -->
   <canvas id="threat-map"></canvas>
 
   <script src="js/main.js"></script>
