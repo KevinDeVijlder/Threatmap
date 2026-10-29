@@ -15,15 +15,16 @@
 
 ---
 
-## Overview
+### Overview
 **Threat map** is a dark-themed, tactical 2D cyber threat map built for Security Operations Center (SOC) wallboards, homelab displays, and public threat monitoring. 
 
 Unlike static mockups or synthetic "pew-pew" toys, this application ingests **live, unauthenticated Open-Source Intelligence (OSINT)** from **abuse.ch Feodo Tracker** and **ThreatFox**, geolocates active Botnet Command & Control (C2) servers and malware distribution hosts, and streams real-time ballistic trajectory arcs to connected browsers over WebSockets.
 
 ---
 
-Project Structure
+### Project Structure
 
+``` bash
 soc-threat-map/
 ├── backend/
 │   ├── data/
@@ -40,36 +41,49 @@ soc-threat-map/
 │   └── index.html                # Main SOC dashboard layout
 ├── .gitignore
 └── README.md
+```
 
-Quick Start
+### Quick Start
 
-1. Clone the Repository
-Bash
+#### 1. Clone the Repository
+```Bash
 git clone [https://github.com/KevinDeVijlder/Threatmap.git](https://github.com/KevinDeVijlder/Threatmap.git)
 cd soc-threat-map
-1. Set Up the Python Backend
-Bash
+```
+
+#### 2. Set Up the Python Backend
+```Bash
 cd backend
 python3 -m venv venv
-Activate the virtual environment:
+```
 
+**Activate the virtual environment:**
 Linux / macOS:
 
-Bash
+```Bash
 source venv/bin/activate
+```
+
 Windows (Git Bash / UCRT64):
 
-Bash
+```Bash
 source venv/Scripts/activate
+```
+
 Windows (PowerShell):
-
-PowerShell
+```PowerShell
 .\venv\Scripts\Activate.ps1
-Install the dependencies:
+```
 
-Bash
+**Install the dependencies:**
+
+```Bash
 pip install -r requirements.txt
-3. Launch the SOC Server
-Bash
+```
+
+#### 3. Launch the SOC Server
+```Bash
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude "venv"
+```
+
 Open http://localhost:8000/ in your browser. The top-left status indicator will lock to LIVE OSINT FEED CONNECTED and real-time global threat arcs will begin streaming immediately.
