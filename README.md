@@ -47,7 +47,7 @@ soc-threat-map/
 
 #### 1. Clone the Repository
 ```Bash
-git clone [https://github.com/KevinDeVijlder/Threatmap.git](https://github.com/KevinDeVijlder/Threatmap.git)
+git clone https://github.com/KevinDeVijlder/Threatmap.git
 cd soc-threat-map
 ```
 
@@ -87,3 +87,23 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude 
 ```
 
 Open http://localhost:8000/ in your browser. The top-left status indicator will lock to LIVE OSINT FEED CONNECTED and real-time global threat arcs will begin streaming immediately.
+
+### Roadmap
+[x] 2D Smooth Vector World Map with #006FFF hover illumination
+
+[x] Ballistic Bézier trajectory arcs & impact shockwaves
+
+[x] Live unauthenticated OSINT ingestion (abuse.ch Feodo Tracker & ThreatFox)
+
+[x] Top 10 Attacking Nations leaderboard with client-side persistence
+
+[ ] Server-Side Persistence: SQLite database for long-term historical attack metrics
+
+[ ] Self-Hosted Firewall / SIEM Mode: Toggleable mode to ingest live WAN drops & IDS/IPS alerts via remote Syslog/CEF (UniFi Dream Machine, pfSense, OPNsense, Suricata)
+
+[ ] Honeypot Integration: Native webhook/socket listener for Cowrie & T-Pot instances
+
+[ ] Containerization: Single-command docker-compose.yml deployment with Nginx reverse proxy support
+
+### License
+Distributed under the MIT License. Built for cybersecurity enthusiasts, homelabbers, and SOC analysts.
