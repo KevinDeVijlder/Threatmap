@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+httpx
+geoip2
+websockets
+python-dotenv
+watchfiles

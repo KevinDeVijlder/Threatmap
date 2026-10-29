@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOC Threat Matrix // 2D Attack Map</title>
+  <title>SOC Threat Matrix // Global OSINT Map</title>
   <link rel="stylesheet" href="css/style.css">
   
   <!-- D3 Geo & TopoJSON -->
@@ -14,16 +14,15 @@
   <!-- Top Telemetry Header -->
   <header class="hud-header">
     <div class="hud-brand">
-      <div class="status-indicator"></div>
+      <div id="conn-status" class="status-indicator"></div>
       <div class="brand-text">
-        <span class="system-title">THREAT_SENSOR // LIVE_SURFACE</span>
-        <span class="system-sub">BALLISTIC ATTACK TRAJECTORY ENGINE</span>
+        <span class="system-title">THREAT_SENSOR // OSINT_LIVE</span>
+        <span class="system-sub" id="conn-label">CONNECTING TO THREAT STREAM...</span>
       </div>
     </div>
     
     <div class="hud-controls">
-      <button id="btn-simulation" class="hud-btn active">SIMULATION: ON</button>
-      <button id="btn-salvo" class="hud-btn highlight">⚡ TRIGGER SALVO</button>
+      <div class="status-badge">LIVE INTEL FEED</div>
     </div>
 
     <div class="hud-telemetry">
@@ -44,18 +43,17 @@
 
   <!-- Left Sidebar Column -->
   <div class="sidebar-column left-column">
-    <!-- Block 1: Target Homelab Beacon & Hover Sector Intel -->
     <aside id="country-intel" class="panel-card idle">
       <div class="panel-header">
-        <span class="panel-tag">HOMELAB TARGET BEACON</span>
-        <span class="panel-status status-target">ACTIVE // BE_SOC_01</span>
+        <span class="panel-tag">GLOBAL THREAT SENSOR GRID</span>
+        <span class="panel-status status-target">OPEN_INTEL // SYNCED</span>
       </div>
 
       <div class="target-card">
         <div class="target-ping"></div>
         <div class="target-meta">
-          <span class="target-name">DEFENSE GATEWAY // WAN</span>
-          <span class="target-coords">50.86° N, 4.63° E (BELGIUM)</span>
+          <span class="target-name">OSINT TELEMETRY FEED</span>
+          <span class="target-coords">ABUSE.CH // THREATFOX & FEODO</span>
         </div>
       </div>
 
@@ -71,19 +69,18 @@
       </div>
     </aside>
 
-    <!-- Block 2: Separate Real-Time Intrusion Feed Card -->
     <aside class="panel-card">
       <div class="panel-header">
         <span class="panel-tag">REAL-TIME INTRUSION FEED</span>
         <span class="panel-status">LIVE STREAM</span>
       </div>
       <div id="attack-ticker" class="attack-ticker">
-        <div class="ticker-empty">LISTENING FOR INBOUND PACKETS...</div>
+        <div class="ticker-empty">LISTENING FOR OSINT INTRUSIONS...</div>
       </div>
     </aside>
   </div>
 
-  <!-- Right Sidebar Column: Top 10 Attacking Nations -->
+  <!-- Right Sidebar Column -->
   <div class="sidebar-column right-column">
     <aside class="panel-card">
       <div class="panel-header">

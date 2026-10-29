@@ -1,73 +1,35 @@
 /**
- * SOC Threat Matrix - Symmetrical Ballistic Attack Arc Engine
- * - Symmetrical map bounds (left and right columns reserved equally at 360px)
- * - Trajectory arcs in electric blue (#006FFF)
- * - Trajectory lines stay fully drawn until the projectile arrives at the destination
- * - Projectile speed reduced ~2.5x so travel takes 3-5 seconds
- * - Header stats: TOTAL ATTACKS COUNTED and ACTIVE ORIGINS
- * - Real-time Top 10 Attacking Nations leaderboard with dynamic sorting
+ * SOC Threat Matrix - Persistent OSINT Attack Map Engine
+ * - Live WebSocket ingestion from FastAPI backend
+ * - Persistent stats via localStorage (survives page reloads)
+ * - Pure real-world OSINT traffic visualization
  */
 
 const CONFIG = {
-  // Homelab SOC Target Coordinates [Longitude, Latitude] (Bertem, Belgium)
-  targetCoords: [4.63, 50.86],
-
-  // Symmetrical Layout Margins
   leftReservedWidth: 360,
   rightReservedWidth: 360,
   topReservedHeight: 70,
   paddingBottom: 30,
 
-  // Unified Primary Palette
   primaryColor: "#006FFF",
   primaryGlow: "rgba(0, 111, 255, 0.65)",
 
-  // Land Styling
   landFill: "#0b1424",
   landStroke: "rgba(0, 111, 255, 0.32)",
   landStrokeWidth: 0.75,
 
-  // Hover Highlight
   hoverFill: "#006FFF",
   hoverStroke: "#00F0FF",
   hoverStrokeWidth: 1.5,
   hoverGlowBlur: 18,
 
-  // Grid
   gridStroke: "rgba(0, 111, 255, 0.08)",
 
-  // Slower projectile speeds (~3-5 seconds in flight at 60 FPS)
   arcSpeedMin: 0.003,
   arcSpeedMax: 0.0055,
+
+  wsUrl: `ws://${window.location.hostname || "localhost"}:8000/ws`,
 };
-
-// Attack Categorization
-const ATTACK_TYPES = [
-  { name: "SSH_BRUTE", port: 22, proto: "TCP" },
-  { name: "HTTPS_EXPLOIT", port: 443, proto: "TCP" },
-  { name: "PORT_SCAN", port: 8080, proto: "TCP" },
-  { name: "RDP_PROBE", port: 3389, proto: "TCP" },
-  { name: "DNS_AMP", port: 53, proto: "UDP" },
-  { name: "SMB_SWEEP", port: 445, proto: "TCP" },
-];
-
-// Attacker Origins for Simulation
-const SAMPLE_ORIGINS = [
-  { country: "China", code: "cn", lat: 39.9, lon: 116.4 },
-  { country: "United States", code: "us", lat: 37.7, lon: -122.4 },
-  { country: "Russia", code: "ru", lat: 55.75, lon: 37.6 },
-  { country: "Brazil", code: "br", lat: -23.5, lon: -46.6 },
-  { country: "Germany", code: "de", lat: 52.5, lon: 13.4 },
-  { country: "Netherlands", code: "nl", lat: 52.3, lon: 4.9 },
-  { country: "India", code: "in", lat: 28.6, lon: 77.2 },
-  { country: "Singapore", code: "sg", lat: 1.35, lon: 103.8 },
-  { country: "South Korea", code: "kr", lat: 37.5, lon: 126.9 },
-  { country: "United Kingdom", code: "gb", lat: 51.5, lon: -0.12 },
-  { country: "France", code: "fr", lat: 48.8, lon: 2.35 },
-  { country: "Canada", code: "ca", lat: 45.4, lon: -75.7 },
-  { country: "Vietnam", code: "vn", lat: 21.0, lon: 105.8 },
-  { country: "Australia", code: "au", lat: -33.8, lon: 151.2 }
-];
 
 const COUNTRY_LOOKUP = {
   4: { name: "Afghanistan", code: "af" },
@@ -162,15 +124,13 @@ class ThreatMap {
     this.canvas = document.getElementById("threat-map");
     this.ctx = this.canvas.getContext("2d");
 
-    // Header HUD
     this.coordsHud = document.getElementById("coords-hud");
     this.hudAttacksTotal = document.getElementById("hud-attacks-total");
     this.hudActiveOrigins = document.getElementById("hud-active-origins");
     this.hudClock = document.getElementById("hud-clock");
-    this.btnSimulation = document.getElementById("btn-simulation");
-    this.btnSalvo = document.getElementById("btn-salvo");
+    this.connStatus = document.getElementById("conn-status");
+    this.connLabel = document.getElementById("conn-label");
 
-    // Panels
     this.countryIntelPanel = document.getElementById("country-intel");
     this.countryNameEl = document.getElementById("country-name");
     this.countryCodeEl = document.getElementById("country-code");
@@ -184,26 +144,25 @@ class ThreatMap {
     this.featureCollection = null;
     this.pixelRatio = window.devicePixelRatio || 1;
 
-    // D3 Projections
     this.projection = null;
     this.geoPath = null;
     this.graticule = d3.geoGraticule().extent([[-180, -60], [180, 85]]).step([15, 15]);
 
-    // Offscreen Hit-Testing Mask
     this.maskData = null;
     this.maskW = 0;
     this.maskH = 0;
     this.hoveredCountryIndex = null;
 
-    // Attacks & Stats
     this.attacks = [];
     this.ripples = [];
-    this.totalAttacksCount = 0;
-    this.countryStats = new Map(); // countryCode -> { name, code, count }
 
-    // Simulation
-    this.simulationActive = true;
-    this.simInterval = null;
+    // Load persistent stats from localStorage
+    this.totalAttacksCount = parseInt(localStorage.getItem("soc_total_attacks") || "0", 10);
+    const savedStats = localStorage.getItem("soc_country_stats");
+    this.countryStats = savedStats ? new Map(JSON.parse(savedStats)) : new Map();
+
+    this.ws = null;
+    this.isWsConnected = false;
 
     this.init();
   }
@@ -212,11 +171,16 @@ class ThreatMap {
     this.startClock();
     this.bindEvents();
 
+    // Render initial saved stats immediately on load
+    this.hudAttacksTotal.textContent = this.totalAttacksCount.toLocaleString();
+    this.hudActiveOrigins.textContent = `${this.countryStats.size} REGIONS`;
+    this.updateLeaderboard();
+
     await this.loadCartography();
     this.resize();
 
     this.animate();
-    this.startSimulation();
+    this.connectWebSocket();
   }
 
   async loadCartography() {
@@ -232,7 +196,6 @@ class ThreatMap {
       }
 
       const allFeatures = topojson.feature(data, data.objects.countries).features;
-      // Filter out Antarctica
       this.countryFeatures = allFeatures.filter(feature => parseInt(feature.id, 10) !== 10);
 
       this.featureCollection = {
@@ -254,7 +217,6 @@ class ThreatMap {
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
 
-    // Symmetrical positioning: map is centered between left and right sidebars
     const mapX = CONFIG.leftReservedWidth;
     const mapY = CONFIG.topReservedHeight;
     const mapW = Math.max(300, width - CONFIG.leftReservedWidth - CONFIG.rightReservedWidth);
@@ -297,6 +259,40 @@ class ThreatMap {
     this.maskData = offCtx.getImageData(0, 0, this.maskW, this.maskH).data;
   }
 
+  connectWebSocket() {
+    try {
+      this.ws = new WebSocket(CONFIG.wsUrl);
+
+      this.ws.onopen = () => {
+        this.isWsConnected = true;
+        this.connStatus.style.backgroundColor = "var(--color-primary)";
+        this.connLabel.textContent = "LIVE OSINT FEED CONNECTED";
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          this.triggerAttack(payload);
+        } catch (err) {
+          console.error("Failed to parse event:", err);
+        }
+      };
+
+      this.ws.onclose = () => {
+        this.isWsConnected = false;
+        this.connStatus.style.backgroundColor = "rgba(255, 170, 0, 0.8)";
+        this.connLabel.textContent = "RECONNECTING TO STREAM...";
+        setTimeout(() => this.connectWebSocket(), 4000);
+      };
+
+      this.ws.onerror = () => {
+        if (this.ws) this.ws.close();
+      };
+    } catch {
+      setTimeout(() => this.connectWebSocket(), 4000);
+    }
+  }
+
   triggerAttack(data) {
     if (!this.projection) return;
 
@@ -314,7 +310,6 @@ class ThreatMap {
     const archAltitude = Math.min(180, Math.max(35, dist * 0.28));
     const controlPoint = { x: midX, y: midY - archAltitude };
 
-    // Slower speed for comfortable observation
     const speed = CONFIG.arcSpeedMin + Math.random() * (CONFIG.arcSpeedMax - CONFIG.arcSpeedMin);
 
     const attackObj = {
@@ -324,7 +319,7 @@ class ThreatMap {
       end: { x: dstScreen[0], y: dstScreen[1] },
       progress: 0,
       speed: speed,
-      color: CONFIG.primaryColor, // Uniform #006FFF
+      color: CONFIG.primaryColor,
       trailLength: 0.16,
       data: data,
     };
@@ -332,13 +327,12 @@ class ThreatMap {
     this.attacks.push(attackObj);
     this.totalAttacksCount++;
 
-    // Origin shockwave
     this.addRipple(srcScreen[0], srcScreen[1], CONFIG.primaryColor, 14, 0.85);
-
-    // Track origin country statistics
     this.recordCountryHit(data.srcCode, data.srcCountry);
 
-    // Update Telemetry Header & Intrusion Ticker
+    // Persist to localStorage
+    localStorage.setItem("soc_total_attacks", this.totalAttacksCount.toString());
+
     this.hudAttacksTotal.textContent = this.totalAttacksCount.toLocaleString();
     this.appendTickerRow(data);
   }
@@ -349,7 +343,9 @@ class ThreatMap {
     }
     this.countryStats.get(code).count++;
 
-    // Update active origins count in header
+    // Save Map state to localStorage
+    localStorage.setItem("soc_country_stats", JSON.stringify(Array.from(this.countryStats.entries())));
+
     this.hudActiveOrigins.textContent = `${this.countryStats.size} REGIONS`;
     this.updateLeaderboard();
   }
@@ -383,14 +379,7 @@ class ThreatMap {
   }
 
   addRipple(x, y, color, maxRadius = 24, maxOpacity = 0.8) {
-    this.ripples.push({
-      x,
-      y,
-      radius: 2,
-      maxRadius,
-      opacity: maxOpacity,
-      color,
-    });
+    this.ripples.push({ x, y, radius: 2, maxRadius, opacity: maxOpacity, color });
   }
 
   appendTickerRow(data) {
@@ -399,7 +388,7 @@ class ThreatMap {
     row.innerHTML = `
       <div class="ticker-left">
         <span class="ticker-badge">${data.name}</span>
-        <span class="ticker-origin">${data.srcCountry}</span>
+        <span class="ticker-origin">${data.srcCountry} → ${data.dstCountry}</span>
       </div>
       <div class="ticker-right">
         <span>PORT: <span class="ticker-port">${data.port}</span></span>
@@ -411,7 +400,6 @@ class ThreatMap {
     if (empty) empty.remove();
 
     this.attackTicker.insertBefore(row, this.attackTicker.firstChild);
-
     while (this.attackTicker.children.length > 5) {
       this.attackTicker.removeChild(this.attackTicker.lastChild);
     }
@@ -428,38 +416,6 @@ class ThreatMap {
   renderAttacks() {
     const ctx = this.ctx;
 
-    // 1. Target Homelab Beacon (Belgium)
-    if (this.projection) {
-      const tgt = this.projection(CONFIG.targetCoords);
-      if (tgt) {
-        ctx.save();
-        ctx.strokeStyle = "rgba(0, 111, 255, 0.6)";
-        ctx.fillStyle = CONFIG.primaryColor;
-        ctx.lineWidth = 1.2;
-
-        ctx.beginPath();
-        ctx.arc(tgt[0], tgt[1], 3.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        const time = performance.now() * 0.002;
-        const ring1 = (time % 1) * 22;
-        const ring2 = ((time + 0.5) % 1) * 22;
-
-        ctx.beginPath();
-        ctx.arc(tgt[0], tgt[1], ring1, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0, 111, 255, ${1 - ring1 / 22})`;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(tgt[0], tgt[1], ring2, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0, 111, 255, ${1 - ring2 / 22})`;
-        ctx.stroke();
-
-        ctx.restore();
-      }
-    }
-
-    // 2. Shockwave Ripples
     for (let i = this.ripples.length - 1; i >= 0; i--) {
       const rip = this.ripples[i];
       rip.radius += 0.55;
@@ -480,12 +436,10 @@ class ThreatMap {
       ctx.restore();
     }
 
-    // 3. Persistent Trajectory Lines & Flying Projectiles
     for (let i = this.attacks.length - 1; i >= 0; i--) {
       const atk = this.attacks[i];
       atk.progress += atk.speed;
 
-      // Upon Impact
       if (atk.progress >= 1) {
         this.addRipple(atk.end.x, atk.end.y, CONFIG.primaryColor, 32, 1.0);
         this.attacks.splice(i, 1);
@@ -494,7 +448,6 @@ class ThreatMap {
 
       ctx.save();
 
-      // FULL Persistent Trajectory Line (stays fully visible for the entire flight)
       ctx.strokeStyle = CONFIG.primaryColor;
       ctx.globalAlpha = 0.32;
       ctx.lineWidth = 1.2;
@@ -503,7 +456,6 @@ class ThreatMap {
       ctx.quadraticCurveTo(atk.control.x, atk.control.y, atk.end.x, atk.end.y);
       ctx.stroke();
 
-      // Traveling Photon Tail
       const tailT = Math.max(0, atk.progress - atk.trailLength);
       const headT = atk.progress;
       const segments = 12;
@@ -525,7 +477,6 @@ class ThreatMap {
         ctx.stroke();
       }
 
-      // Projectile Core (Bright White Head with Electric Blue Bloom)
       const headPt = this.getBezierPoint(headT, atk.start, atk.control, atk.end);
       ctx.shadowColor = CONFIG.primaryColor;
       ctx.shadowBlur = 14;
@@ -546,7 +497,6 @@ class ThreatMap {
 
     if (!this.geoPath) return;
 
-    // Graticule Lines
     ctx.save();
     ctx.strokeStyle = CONFIG.gridStroke;
     ctx.lineWidth = 0.75;
@@ -556,7 +506,6 @@ class ThreatMap {
     ctx.stroke();
     ctx.restore();
 
-    // Base Landmasses
     ctx.save();
     ctx.fillStyle = CONFIG.landFill;
     ctx.strokeStyle = CONFIG.landStroke;
@@ -571,7 +520,6 @@ class ThreatMap {
     }
     ctx.restore();
 
-    // Hovered Country
     if (this.hoveredCountryIndex !== null) {
       const feature = this.countryFeatures[this.hoveredCountryIndex - 1];
       if (feature) {
@@ -590,46 +538,12 @@ class ThreatMap {
       }
     }
 
-    // Attacks & Impact Ripples
     this.renderAttacks();
   }
 
   animate() {
     this.render();
     requestAnimationFrame(() => this.animate());
-  }
-
-  spawnRandomAttack() {
-    const origin = SAMPLE_ORIGINS[Math.floor(Math.random() * SAMPLE_ORIGINS.length)];
-    const type = ATTACK_TYPES[Math.floor(Math.random() * ATTACK_TYPES.length)];
-
-    this.triggerAttack({
-      srcCountry: origin.country,
-      srcCode: origin.code,
-      srcLat: origin.lat + (Math.random() - 0.5) * 4,
-      srcLon: origin.lon + (Math.random() - 0.5) * 4,
-      dstLat: CONFIG.targetCoords[1],
-      dstLon: CONFIG.targetCoords[0],
-      name: type.name,
-      port: type.port,
-      proto: type.proto,
-    });
-  }
-
-  startSimulation() {
-    const scheduleNext = () => {
-      if (!this.simulationActive) return;
-      this.spawnRandomAttack();
-      const delay = Math.floor(Math.random() * 1400) + 700;
-      this.simInterval = setTimeout(scheduleNext, delay);
-    };
-    scheduleNext();
-  }
-
-  triggerSalvo() {
-    for (let i = 0; i < 6; i++) {
-      setTimeout(() => this.spawnRandomAttack(), i * 160);
-    }
   }
 
   updateIntelPanel(countryIndex) {
@@ -676,21 +590,12 @@ class ThreatMap {
       this.resize();
     });
 
-    this.btnSimulation.addEventListener("click", () => {
-      this.simulationActive = !this.simulationActive;
-      if (this.simulationActive) {
-        this.btnSimulation.classList.add("active");
-        this.btnSimulation.textContent = "SIMULATION: ON";
-        this.startSimulation();
-      } else {
-        this.btnSimulation.classList.remove("active");
-        this.btnSimulation.textContent = "SIMULATION: OFF";
-        clearTimeout(this.simInterval);
+    // Handle background tab throttling: clear backlog on return to prevent burst rendering
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        this.attacks = [];
+        this.ripples = [];
       }
-    });
-
-    this.btnSalvo.addEventListener("click", () => {
-      this.triggerSalvo();
     });
 
     this.canvas.addEventListener("mousemove", (e) => {
