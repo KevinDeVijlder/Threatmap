@@ -11,6 +11,12 @@
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 </head>
 <body>
+  <!-- Floating Country Cursor Tooltip (Follows mouse on country hover) -->
+  <div id="cursor-tooltip" class="cursor-tooltip">
+    <img id="cursor-tooltip-flag" class="cursor-tooltip-flag" src="" alt="Flag" />
+    <span id="cursor-tooltip-name" class="cursor-tooltip-name"></span>
+  </div>
+
   <!-- Top Telemetry Header -->
   <header class="hud-header">
     <div class="hud-brand">
@@ -41,9 +47,8 @@
     </div>
   </header>
 
-  <!-- Spacious Bottom-Left Command Deck (580px wide) -->
+  <!-- Bottom-Left Command Deck -->
   <aside class="bottom-left-deck">
-    <!-- Top Bar: Target Status + Hovered Country Identity & Reticle -->
     <div id="country-intel" class="deck-intel-bar idle">
       <div class="intel-left">
         <div class="flag-wrapper">
@@ -58,7 +63,6 @@
       <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>
     </div>
 
-    <!-- Main Section: Real-Time Intrusion Feed -->
     <div class="deck-feed-card">
       <div class="feed-header">
         <span class="feed-tag">REAL-TIME INTRUSION FEED</span>
@@ -70,14 +74,26 @@
     </div>
   </aside>
 
-  <!-- Right Sidebar: Top 10 Attacking Nations -->
+  <!-- Right Sidebar Column: Top 10 Attacking & Top 10 Under Attack -->
   <div class="sidebar-column right-column">
+    <!-- Panel 1: Attacking Nations -->
     <aside class="panel-card">
       <div class="panel-header">
         <span class="panel-tag">TOP 10 ATTACKING NATIONS</span>
         <span class="panel-status" id="leaderboard-total-hits">0 HITS</span>
       </div>
       <div id="leaderboard-list" class="leaderboard-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </aside>
+
+    <!-- Panel 2: Nations Under Attack -->
+    <aside class="panel-card">
+      <div class="panel-header">
+        <span class="panel-tag">TOP 10 NATIONS UNDER ATTACK</span>
+        <span class="panel-status" id="target-total-hits">0 HITS</span>
+      </div>
+      <div id="target-leaderboard-list" class="leaderboard-list">
         <!-- Rendered dynamically -->
       </div>
     </aside>

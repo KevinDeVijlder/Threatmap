@@ -1,33 +1,33 @@
 /**
- * SOC Threat Matrix - Precision OSINT Visualization Engine
- * Features:
- * - D3.js vector map with spacious bottom-left command deck
- * - Launch from exact city coordinates (no artificial scatter)
- * - Origin & destination city beacons on map
- * - Two-tier spacious threat feed (Malware, Cities, CVE, MITRE, ASN)
+ * SOC Threat Matrix - Clean Coastline World Map Engine
+ * - Zero internal country borders; only outer coastlines rendered in primary blue
+ * - Full O(1) RGB hit-mask for country hover & floating flag/name cursor tooltip
+ * - Enlarged attacking city nameplates persisting until arc impact
+ * - Symmetrical 360px margins and Dual Top 10 Leaderboards
  */
 
 const CONFIG = {
-  // Map Layout Margins (Unblocks the entire western hemisphere)
-  leftMargin: 40,
-  rightReservedWidth: 350,
+  // Symmetrical Left & Right Map Margins
+  horizontalMargin: 360,
   topReservedHeight: 75,
-  bottomMargin: 30,
+  bottomMargin: 45,
 
-  primaryColor: "#006FFF",
-  primaryGlow: "rgba(0, 111, 255, 0.65)",
+  // Map Styling (No internal borders, blue coastline outlines)
+  landFill: "#0b172e",                    // Sleek Deep Navy Continent Interior
+  coastlineStroke: "#ffffff", // white
+  coastlineWidth: 1.5,
 
-  landFill: "#0b1424",
-  landStroke: "rgba(0, 111, 255, 0.32)",
-  landStrokeWidth: 0.75,
+  // Hover Highlight Styling
+  hoverFill: "#006FFF",                   // UniFi Electric Blue Fill
+  hoverStroke: "#00F0FF",                 // Neon Cyan Border
+  hoverStrokeWidth: 1.8,
+  hoverGlowBlur: 16,
 
-  hoverFill: "#006FFF",
-  hoverStroke: "#00F0FF",
-  hoverStrokeWidth: 1.5,
-  hoverGlowBlur: 18,
-
+  // Subtle Graticule Reference Grid
   gridStroke: "rgba(0, 111, 255, 0.08)",
 
+  // Attack Trajectory & City Badges
+  primaryArcColor: "#006FFF",
   arcSpeedMin: 0.003,
   arcSpeedMax: 0.0055,
 
@@ -127,6 +127,7 @@ class ThreatMap {
     this.canvas = document.getElementById("threat-map");
     this.ctx = this.canvas.getContext("2d");
 
+    // Header & HUD DOM references
     this.coordsHud = document.getElementById("coords-hud");
     this.hudAttacksTotal = document.getElementById("hud-attacks-total");
     this.hudActiveOrigins = document.getElementById("hud-active-origins");
@@ -134,34 +135,53 @@ class ThreatMap {
     this.connStatus = document.getElementById("conn-status");
     this.connLabel = document.getElementById("conn-label");
 
+    // Floating Cursor Tooltip Elements
+    this.cursorTooltip = document.getElementById("cursor-tooltip");
+    this.cursorTooltipFlag = document.getElementById("cursor-tooltip-flag");
+    this.cursorTooltipName = document.getElementById("cursor-tooltip-name");
+
+    // Bottom-Left Deck
     this.countryIntelBar = document.getElementById("country-intel");
     this.countryNameEl = document.getElementById("country-name");
     this.countryCodeEl = document.getElementById("country-code");
     this.countryFlagEl = document.getElementById("country-flag");
     this.flagPlaceholderEl = document.getElementById("flag-placeholder");
     this.attackTicker = document.getElementById("attack-ticker");
+
+    // Right Sidebar Dual Leaderboards
     this.leaderboardList = document.getElementById("leaderboard-list");
     this.leaderboardTotalHits = document.getElementById("leaderboard-total-hits");
+    this.targetLeaderboardList = document.getElementById("target-leaderboard-list");
+    this.targetTotalHits = document.getElementById("target-total-hits");
 
+    // Cartography Data
     this.countryFeatures = [];
     this.featureCollection = null;
+    this.coastlineMesh = null;
     this.pixelRatio = window.devicePixelRatio || 1;
 
+    // D3 Projection & Path
     this.projection = null;
     this.geoPath = null;
     this.graticule = d3.geoGraticule().extent([[-180, -60], [180, 85]]).step([15, 15]);
 
+    // Offscreen RGB Hit-Mask
     this.maskData = null;
     this.maskW = 0;
     this.maskH = 0;
     this.hoveredCountryIndex = null;
 
+    // Active Trajectories
     this.attacks = [];
     this.ripples = [];
 
+    // Persistent Telemetry
     this.totalAttacksCount = parseInt(localStorage.getItem("soc_total_attacks") || "0", 10);
-    const savedStats = localStorage.getItem("soc_country_stats");
-    this.countryStats = savedStats ? new Map(JSON.parse(savedStats)) : new Map();
+    const savedOriginStats = localStorage.getItem("soc_country_stats");
+    this.countryStats = savedOriginStats ? new Map(JSON.parse(savedOriginStats)) : new Map();
+
+    const savedTargetStats = localStorage.getItem("soc_target_stats");
+    this.targetStats = savedTargetStats ? new Map(JSON.parse(savedTargetStats)) : new Map();
 
     this.ws = null;
     this.isWsConnected = false;
@@ -175,7 +195,7 @@ class ThreatMap {
 
     this.hudAttacksTotal.textContent = this.totalAttacksCount.toLocaleString();
     this.hudActiveOrigins.textContent = `${this.countryStats.size} REGIONS`;
-    this.updateLeaderboard();
+    this.updateLeaderboards();
 
     await this.loadCartography();
     this.resize();
@@ -197,12 +217,20 @@ class ThreatMap {
       }
 
       const allFeatures = topojson.feature(data, data.objects.countries).features;
+      // Exclude Antarctica (ID 10)
       this.countryFeatures = allFeatures.filter(feature => parseInt(feature.id, 10) !== 10);
 
       this.featureCollection = {
         type: "FeatureCollection",
         features: this.countryFeatures
       };
+
+      // Extract exterior coastline boundaries (a === b) to eliminate internal country borders
+      this.coastlineMesh = topojson.mesh(data, data.objects.countries, (a, b) => {
+        const idA = parseInt(a.id, 10);
+        const idB = parseInt(b.id, 10);
+        return (a === b) && (idA !== 10) && (idB !== 10);
+      });
     } catch (e) {
       console.error("Failed to load map topology data:", e);
     }
@@ -218,10 +246,9 @@ class ThreatMap {
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
 
-    // Map now occupies almost the entire screen, giving huge space to the Americas & Europe
-    const mapX = CONFIG.leftMargin;
+    const mapX = CONFIG.horizontalMargin;
     const mapY = CONFIG.topReservedHeight;
-    const mapW = Math.max(300, width - CONFIG.leftMargin - CONFIG.rightReservedWidth);
+    const mapW = Math.max(300, width - CONFIG.horizontalMargin * 2);
     const mapH = Math.max(200, height - mapY - CONFIG.bottomMargin);
 
     if (this.featureCollection) {
@@ -267,7 +294,7 @@ class ThreatMap {
 
       this.ws.onopen = () => {
         this.isWsConnected = true;
-        this.connStatus.style.backgroundColor = "var(--color-primary)";
+        this.connStatus.style.backgroundColor = CONFIG.primaryArcColor;
         this.connLabel.textContent = "LIVE OSINT FEED CONNECTED";
       };
 
@@ -282,7 +309,7 @@ class ThreatMap {
 
       this.ws.onclose = () => {
         this.isWsConnected = false;
-        this.connStatus.style.backgroundColor = "rgba(255, 170, 0, 0.8)";
+        this.connStatus.style.backgroundColor = "#FFAA00";
         this.connLabel.textContent = "RECONNECTING TO STREAM...";
         setTimeout(() => this.connectWebSocket(), 4000);
       };
@@ -298,7 +325,6 @@ class ThreatMap {
   triggerAttack(data) {
     if (!this.projection) return;
 
-    // Convert exact city coordinates to screen pixels
     const srcScreen = this.projection([data.srcLon, data.srcLat]);
     const dstScreen = this.projection([data.dstLon, data.dstLat]);
     if (!srcScreen || !dstScreen) return;
@@ -321,41 +347,50 @@ class ThreatMap {
       end: { x: dstScreen[0], y: dstScreen[1] },
       progress: 0,
       speed: speed,
-      color: CONFIG.primaryColor,
+      color: CONFIG.primaryArcColor,
       trailLength: 0.16,
+      cityName: (data.srcCity && data.srcCity !== "Unknown") ? data.srcCity : data.srcCountry,
       data: data,
     });
 
-    // Spawn radar shockwave at exact city launch point
-    this.addRipple(srcScreen[0], srcScreen[1], CONFIG.primaryColor, 14, 0.85);
+    this.addRipple(srcScreen[0], srcScreen[1], CONFIG.primaryArcColor, 16, 0.85);
     this.totalAttacksCount++;
     localStorage.setItem("soc_total_attacks", this.totalAttacksCount.toString());
 
-    this.recordCountryHit(data.srcCode, data.srcCountry);
+    this.recordStats(data.srcCode, data.srcCountry, data.dstCode, data.dstCountry);
     this.hudAttacksTotal.textContent = this.totalAttacksCount.toLocaleString();
     this.appendTickerRow(data);
   }
 
-  recordCountryHit(code, name) {
-    if (!this.countryStats.has(code)) {
-      this.countryStats.set(code, { code, name, count: 0 });
+  recordStats(srcCode, srcName, dstCode, dstName) {
+    if (srcCode) {
+      if (!this.countryStats.has(srcCode)) {
+        this.countryStats.set(srcCode, { code: srcCode, name: srcName, count: 0 });
+      }
+      this.countryStats.get(srcCode).count++;
+      localStorage.setItem("soc_country_stats", JSON.stringify(Array.from(this.countryStats.entries())));
     }
-    this.countryStats.get(code).count++;
 
-    localStorage.setItem("soc_country_stats", JSON.stringify(Array.from(this.countryStats.entries())));
+    if (dstCode) {
+      if (!this.targetStats.has(dstCode)) {
+        this.targetStats.set(dstCode, { code: dstCode, name: dstName, count: 0 });
+      }
+      this.targetStats.get(dstCode).count++;
+      localStorage.setItem("soc_target_stats", JSON.stringify(Array.from(this.targetStats.entries())));
+    }
+
     this.hudActiveOrigins.textContent = `${this.countryStats.size} REGIONS`;
-    this.updateLeaderboard();
+    this.updateLeaderboards();
   }
 
-  updateLeaderboard() {
-    const sorted = Array.from(this.countryStats.values())
+  renderLeaderboardHTML(statsMap) {
+    const sorted = Array.from(statsMap.values())
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
     const maxHits = sorted.length > 0 ? sorted[0].count : 1;
-    this.leaderboardTotalHits.textContent = `${this.totalAttacksCount.toLocaleString()} HITS`;
 
-    this.leaderboardList.innerHTML = sorted.map((item, index) => {
+    return sorted.map((item, index) => {
       const pct = Math.round((item.count / maxHits) * 100);
       return `
         <div class="leaderboard-row">
@@ -373,6 +408,15 @@ class ThreatMap {
         </div>
       `;
     }).join("");
+  }
+
+  updateLeaderboards() {
+    const hitsLabel = `${this.totalAttacksCount.toLocaleString()} HITS`;
+    this.leaderboardTotalHits.textContent = hitsLabel;
+    this.targetTotalHits.textContent = hitsLabel;
+
+    this.leaderboardList.innerHTML = this.renderLeaderboardHTML(this.countryStats);
+    this.targetLeaderboardList.innerHTML = this.renderLeaderboardHTML(this.targetStats);
   }
 
   appendTickerRow(data) {
@@ -454,36 +498,68 @@ class ThreatMap {
       ctx.restore();
     }
 
-    // 2. Trajectories & Origin/Destination City Beacons
+    // 2. Trajectories & Enlarged Origin City Nameplates
     for (let i = this.attacks.length - 1; i >= 0; i--) {
       const atk = this.attacks[i];
       atk.progress += atk.speed;
 
       if (atk.progress >= 1) {
-        this.addRipple(atk.end.x, atk.end.y, CONFIG.primaryColor, 32, 1.0);
+        this.addRipple(atk.end.x, atk.end.y, CONFIG.primaryArcColor, 32, 1.0);
         this.attacks.splice(i, 1);
         continue;
       }
 
       ctx.save();
 
-      // Draw subtle city origin node on the map
-      ctx.fillStyle = CONFIG.primaryColor;
-      ctx.globalAlpha = 0.8;
+      // Launch City Beacon Dot
+      ctx.fillStyle = CONFIG.primaryArcColor;
+      ctx.shadowColor = CONFIG.primaryArcColor;
+      ctx.shadowBlur = 10;
       ctx.beginPath();
-      ctx.arc(atk.start.x, atk.start.y, 2.0, 0, Math.PI * 2);
+      ctx.arc(atk.start.x, atk.start.y, 3.2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Persistent Trajectory Guide
-      ctx.strokeStyle = CONFIG.primaryColor;
-      ctx.globalAlpha = 0.32;
-      ctx.lineWidth = 1.2;
+      // Enlarged Attack Launch City Nameplate (Persists until arc disappears)
+      const labelText = atk.cityName.toUpperCase();
+      ctx.font = "700 13px JetBrains Mono, monospace";
+      const textMetrics = ctx.measureText(labelText);
+      const labelW = textMetrics.width + 24;
+      const labelH = 24;
+      const labelX = atk.start.x + 8;
+      const labelY = atk.start.y - 28;
+
+      ctx.fillStyle = "rgba(8, 16, 32, 0.94)";
+      ctx.strokeStyle = "#006FFF";
+      ctx.lineWidth = 1.4;
+      ctx.shadowColor = "rgba(0, 111, 255, 0.45)";
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.roundRect(labelX, labelY, labelW, labelH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing indicator dot inside nameplate
+      ctx.fillStyle = "#00F0FF";
+      ctx.beginPath();
+      ctx.arc(labelX + 9, labelY + labelH / 2, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Crisp City Name Text
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 0;
+      ctx.textBaseline = "middle";
+      ctx.fillText(labelText, labelX + 17, labelY + labelH / 2 + 0.5);
+
+      // Persistent Full Trajectory Guide Line
+      ctx.strokeStyle = CONFIG.primaryArcColor;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.moveTo(atk.start.x, atk.start.y);
       ctx.quadraticCurveTo(atk.control.x, atk.control.y, atk.end.x, atk.end.y);
       ctx.stroke();
 
-      // Flying photon tail
+      // Tapered Laser Tail
       const tailT = Math.max(0, atk.progress - atk.trailLength);
       const headT = atk.progress;
       const segments = 12;
@@ -496,7 +572,7 @@ class ThreatMap {
         const pt2 = this.getBezierPoint(t2, atk.start, atk.control, atk.end);
         const segAlpha = (s + 1) / segments;
 
-        ctx.strokeStyle = CONFIG.primaryColor;
+        ctx.strokeStyle = CONFIG.primaryArcColor;
         ctx.globalAlpha = segAlpha * 0.95;
         ctx.lineWidth = 1.4 + segAlpha * 2.2;
         ctx.beginPath();
@@ -507,12 +583,12 @@ class ThreatMap {
 
       // Bright Projectile Head
       const headPt = this.getBezierPoint(headT, atk.start, atk.control, atk.end);
-      ctx.shadowColor = CONFIG.primaryColor;
+      ctx.shadowColor = CONFIG.primaryArcColor;
       ctx.shadowBlur = 14;
       ctx.fillStyle = "#FFFFFF";
       ctx.globalAlpha = 1.0;
       ctx.beginPath();
-      ctx.arc(headPt.x, headPt.y, 2.6, 0, Math.PI * 2);
+      ctx.arc(headPt.x, headPt.y, 2.8, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -526,7 +602,7 @@ class ThreatMap {
 
     if (!this.geoPath) return;
 
-    // Graticule Lines
+    // 1. Subtle Graticule Lat/Lon Reference Grid
     ctx.save();
     ctx.strokeStyle = CONFIG.gridStroke;
     ctx.lineWidth = 0.75;
@@ -536,22 +612,31 @@ class ThreatMap {
     ctx.stroke();
     ctx.restore();
 
-    // Base Landmasses
+    // 2. Smooth Vector Continental Fill (Zero internal country borders)
     ctx.save();
     ctx.fillStyle = CONFIG.landFill;
-    ctx.strokeStyle = CONFIG.landStroke;
-    ctx.lineWidth = CONFIG.landStrokeWidth;
-
     for (let i = 0; i < this.countryFeatures.length; i++) {
       if (i + 1 === this.hoveredCountryIndex) continue;
       ctx.beginPath();
       this.geoPath(this.countryFeatures[i]);
       ctx.fill();
-      ctx.stroke();
     }
     ctx.restore();
 
-    // Hovered Country
+    // 3. Clean Outer Coastline Outline Only (No internal country borders)
+    if (this.coastlineMesh) {
+      ctx.save();
+      ctx.strokeStyle = CONFIG.coastlineStroke;
+      ctx.lineWidth = CONFIG.coastlineWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      this.geoPath(this.coastlineMesh);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. Hovered Country (Elevated in Electric Blue + Cyan outline on hover only)
     if (this.hoveredCountryIndex !== null) {
       const feature = this.countryFeatures[this.hoveredCountryIndex - 1];
       if (feature) {
@@ -561,6 +646,8 @@ class ThreatMap {
         ctx.lineWidth = CONFIG.hoverStrokeWidth;
         ctx.shadowColor = CONFIG.hoverFill;
         ctx.shadowBlur = CONFIG.hoverGlowBlur;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
 
         ctx.beginPath();
         this.geoPath(feature);
@@ -570,6 +657,7 @@ class ThreatMap {
       }
     }
 
+    // 5. Trajectories & Origin City Nameplates
     this.renderAttacks();
   }
 
@@ -578,8 +666,9 @@ class ThreatMap {
     requestAnimationFrame(() => this.animate());
   }
 
-  updateIntelPanel(countryIndex) {
+  updateHoverIntel(countryIndex, clientX, clientY) {
     if (!countryIndex || countryIndex <= 0 || countryIndex > this.countryFeatures.length) {
+      this.cursorTooltip.style.display = "none";
       this.countryIntelBar.classList.remove("active");
       this.countryIntelBar.classList.add("idle");
       this.countryNameEl.textContent = "STANDBY // SENSORS ONLINE";
@@ -597,19 +686,29 @@ class ThreatMap {
     this.countryIntelBar.classList.remove("idle");
 
     if (meta) {
+      const flagUrl = `https://flagcdn.com/w80/${meta.code.toLowerCase()}.png`;
+
+      this.cursorTooltipFlag.style.display = "block";
+      this.cursorTooltipFlag.src = flagUrl;
+      this.cursorTooltipName.textContent = meta.name.toUpperCase();
+      this.cursorTooltip.style.left = `${clientX}px`;
+      this.cursorTooltip.style.top = `${clientY}px`;
+      this.cursorTooltip.style.display = "flex";
+
       this.countryNameEl.textContent = meta.name.toUpperCase();
       this.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} // ID: ${numericId}`;
-      
-      this.countryFlagEl.src = `https://flagcdn.com/w80/${meta.code.toLowerCase()}.png`;
+      this.countryFlagEl.src = flagUrl;
       this.countryFlagEl.onload = () => {
         this.countryFlagEl.style.display = "block";
         this.flagPlaceholderEl.style.display = "none";
       };
-      this.countryFlagEl.onerror = () => {
-        this.countryFlagEl.style.display = "none";
-        this.flagPlaceholderEl.style.display = "block";
-      };
     } else {
+      this.cursorTooltipFlag.style.display = "none";
+      this.cursorTooltipName.textContent = `TERRITORY [${numericId}]`;
+      this.cursorTooltip.style.left = `${clientX}px`;
+      this.cursorTooltip.style.top = `${clientY}px`;
+      this.cursorTooltip.style.display = "flex";
+
       this.countryNameEl.textContent = `TERRITORY [${numericId}]`;
       this.countryCodeEl.textContent = `GEO_ID: ${numericId}`;
       this.countryFlagEl.style.display = "none";
@@ -665,17 +764,13 @@ class ThreatMap {
         }
       }
 
-      if (detectedCountryIdx !== this.hoveredCountryIndex) {
-        this.hoveredCountryIndex = detectedCountryIdx;
-        this.updateIntelPanel(detectedCountryIdx);
-      }
+      this.hoveredCountryIndex = detectedCountryIdx;
+      this.updateHoverIntel(detectedCountryIdx, e.clientX, e.clientY);
     });
 
     this.canvas.addEventListener("mouseleave", () => {
-      if (this.hoveredCountryIndex !== null) {
-        this.hoveredCountryIndex = null;
-        this.updateIntelPanel(null);
-      }
+      this.hoveredCountryIndex = null;
+      this.updateHoverIntel(null, 0, 0);
     });
   }
 
