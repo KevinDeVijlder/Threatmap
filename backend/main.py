@@ -1,10 +1,12 @@
 """
-SOC Threat Matrix - Precision OSINT Ingestion & WebSocket Streamer
-================================================================
-- Ingests abuse.ch Feodo Tracker and ThreatFox feeds.
-- Geocodes IPs to exact city-level coordinates (no artificial jitter).
-- Pairs threats with realistic destination sensor cities.
-- Enriches events with MITRE ATT&CK, CVE, ASN, and category taxonomy.
+SOC Threat Matrix - High-Volume OSINT Ingestion & WebSocket Streamer
+====================================================================
+- Ingests live indicators from:
+  1. abuse.ch Feodo Tracker (Botnet C2s)
+  2. abuse.ch ThreatFox (ip:port & URL-based malware hosts)
+  3. abuse.ch URLhaus Online Payloads (Global malware distribution servers)
+  4. CINS Score / Active Scanner Intelligence
+- Geocodes up to 200 unique IPs per cycle to exact city-level coordinates.
 """
 
 import asyncio
@@ -12,6 +14,7 @@ import json
 import logging
 import os
 import random
+import re
 from contextlib import asynccontextmanager
 from typing import Dict, List
 import httpx
@@ -22,7 +25,10 @@ from fastapi.staticfiles import StaticFiles
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("OSINT_ENGINE")
 
-# Exact Destination Sensor Nodes with authentic city coordinates
+# Regex to extract IPv4 and optional port from raw IOCs and URLs
+IPV4_REGEX = re.compile(r"(?:https?://)?(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?")
+
+# Exact Destination Sensor Nodes
 GLOBAL_SENSOR_NODES = [
     {"country": "United States", "code": "us", "city": "Ashburn", "lat": 39.0438, "lon": -77.4874},
     {"country": "United States", "code": "us", "city": "San Francisco", "lat": 37.7749, "lon": -122.4194},
@@ -40,24 +46,6 @@ GLOBAL_SENSOR_NODES = [
     {"country": "South Korea", "code": "kr", "city": "Seoul", "lat": 37.5665, "lon": 126.9780},
 ]
 
-# Fallback cities if geocoder is temporarily offline
-COUNTRY_FALLBACKS = {
-    "CN": {"country": "China", "city": "Beijing", "lat": 39.9042, "lon": 116.4074, "asn": "AS4134 CHINANET"},
-    "US": {"country": "United States", "city": "New York", "lat": 40.7128, "lon": -74.0060, "asn": "AS14061 DIGITALOCEAN"},
-    "RU": {"country": "Russia", "city": "Moscow", "lat": 55.7558, "lon": 37.6173, "asn": "AS12389 ROSTELECOM"},
-    "DE": {"country": "Germany", "city": "Frankfurt", "lat": 50.1109, "lon": 8.6821, "asn": "AS24940 HETZNER"},
-    "NL": {"country": "Netherlands", "city": "Amsterdam", "lat": 52.3676, "lon": 4.9041, "asn": "AS49981 LEASEWEB"},
-    "BR": {"country": "Brazil", "city": "Rio de Janeiro", "lat": -22.9068, "lon": -43.1729, "asn": "AS28573 CLARO"},
-    "IN": {"country": "India", "city": "Mumbai", "lat": 19.0760, "lon": 72.8777, "asn": "AS55836 RELIANCE"},
-    "GB": {"country": "United Kingdom", "city": "London", "lat": 51.5074, "lon": -0.1278, "asn": "AS9009 M247"},
-    "FR": {"country": "France", "city": "Paris", "lat": 48.8566, "lon": 2.3522, "asn": "AS16276 OVH"},
-    "KR": {"country": "South Korea", "city": "Seoul", "lat": 37.5665, "lon": 126.9780, "asn": "AS4766 KIXS"},
-    "SG": {"country": "Singapore", "city": "Singapore", "lat": 1.3521, "lon": 103.8198, "asn": "AS4657 STARHUB"},
-    "VN": {"country": "Vietnam", "city": "Hanoi", "lat": 21.0285, "lon": 105.8542, "asn": "AS7552 VIETTEL"},
-    "UA": {"country": "Ukraine", "city": "Kyiv", "lat": 50.4501, "lon": 30.5234, "asn": "AS6849 UKRTELECOM"},
-    "IR": {"country": "Iran", "city": "Tehran", "lat": 35.6892, "lon": 51.3890, "asn": "AS58224 TIC"},
-}
-
 THREAT_TAXONOMY = {
     "COBALT_STRIKE": {"category": "C2_BEACON", "mitre": "T1071.001", "cve": "CVE-2022-30190", "severity": "CRITICAL"},
     "LUMMA": {"category": "INFOSTEALER", "mitre": "T1555", "cve": "CVE-2023-38831", "severity": "HIGH"},
@@ -67,20 +55,25 @@ THREAT_TAXONOMY = {
     "QAKBOT": {"category": "BOTNET_C2", "mitre": "T1055", "cve": "CVE-2023-23397", "severity": "CRITICAL"},
     "EMOTET": {"category": "BOTNET_C2", "mitre": "T1566.001", "cve": "CVE-2021-40444", "severity": "CRITICAL"},
     "MIRAI": {"category": "IOT_BOTNET", "mitre": "T1110.001", "cve": "CVE-2023-1389", "severity": "HIGH"},
+    "MOZI": {"category": "IOT_BOTNET", "mitre": "T1190", "cve": "CVE-2022-30525", "severity": "HIGH"},
+    "GAFGYT": {"category": "IOT_BOTNET", "mitre": "T1110", "cve": "CVE-2021-35394", "severity": "HIGH"},
     "METASPLOIT": {"category": "EXPLOIT_KIT", "mitre": "T1190", "cve": "CVE-2024-3400", "severity": "CRITICAL"},
     "HAVOC": {"category": "C2_BEACON", "mitre": "T1071.001", "cve": "CVE-2023-3519", "severity": "HIGH"},
     "LOCKBIT": {"category": "RANSOMWARE", "mitre": "T1486", "cve": "CVE-2023-4966", "severity": "CRITICAL"},
+    "ASYNC_RAT": {"category": "RAT_TROJAN", "mitre": "T1219", "cve": "CVE-2023-38831", "severity": "HIGH"},
+    "REMCOM": {"category": "RAT_TROJAN", "mitre": "T1059", "cve": "CVE-2022-30190", "severity": "HIGH"},
 }
 
 PORT_SIGNATURES = {
     22: {"category": "BRUTE_FORCE", "mitre": "T1110.001", "cve": "CVE-2024-6387", "name": "OPENSSH_SCAN", "severity": "HIGH"},
     23: {"category": "IOT_PROBE", "mitre": "T1110.001", "cve": "CVE-2022-26134", "name": "TELNET_BRUTE", "severity": "MEDIUM"},
-    80: {"category": "WEB_EXPLOIT", "mitre": "T1190", "cve": "CVE-2021-44228", "name": "HTTP_EXPLOIT", "severity": "HIGH"},
+    80: {"category": "WEB_EXPLOIT", "mitre": "T1190", "cve": "CVE-2021-44228", "name": "HTTP_PAYLOAD", "severity": "HIGH"},
     443: {"category": "C2_TUNNEL", "mitre": "T1071.001", "cve": "CVE-2024-3400", "name": "SSL_C2_BEACON", "severity": "CRITICAL"},
     445: {"category": "SMB_LATERAL", "mitre": "T1021.002", "cve": "CVE-2017-0144", "name": "ETERNALBLUE", "severity": "CRITICAL"},
     3389: {"category": "REMOTE_ACCESS", "mitre": "T1021.001", "cve": "CVE-2019-0708", "name": "BLUEKEEP_PROBE", "severity": "HIGH"},
-    8080: {"category": "PROXY_SCAN", "mitre": "T1190", "cve": "CVE-2023-34362", "name": "MOVEIT_SCAN", "severity": "HIGH"},
+    8080: {"category": "PROXY_SCAN", "mitre": "T1190", "cve": "CVE-2023-34362", "name": "HTTP_PROXY_EXP", "severity": "HIGH"},
 }
+
 
 class ConnectionManager:
     def __init__(self):
@@ -106,10 +99,12 @@ class ConnectionManager:
             except Exception:
                 self.disconnect(connection)
 
+
 manager = ConnectionManager()
 
+
 def enrich_threat_metadata(raw_name: str, port: int) -> Dict:
-    upper_name = raw_name.upper()
+    upper_name = raw_name.upper().replace(" ", "_")
     for key, data in THREAT_TAXONOMY.items():
         if key in upper_name:
             return {
@@ -117,51 +112,55 @@ def enrich_threat_metadata(raw_name: str, port: int) -> Dict:
                 "category": data["category"],
                 "mitre": data["mitre"],
                 "cve": data["cve"],
-                "severity": data["severity"]
+                "severity": data["severity"],
             }
 
     if port in PORT_SIGNATURES:
         sig = PORT_SIGNATURES[port]
         return {
-            "malware": upper_name[:16] if upper_name != "BOTNET_C2" else sig["name"],
+            "malware": upper_name[:16] if upper_name not in ("BOTNET_C2", "MALWARE", "SCANNER") else sig["name"],
             "category": sig["category"],
             "mitre": sig["mitre"],
             "cve": sig["cve"],
-            "severity": sig["severity"]
+            "severity": sig["severity"],
         }
 
     return {
-        "malware": upper_name[:16] if upper_name else "MALICIOUS_C2",
-        "category": "NETWORK_C2",
-        "mitre": "T1071",
-        "cve": "CVE-GENERIC",
-        "severity": "MEDIUM"
+        "malware": upper_name[:16] if upper_name else "MALICIOUS_HOST",
+        "category": "MALWARE_DROP",
+        "mitre": "T1190",
+        "cve": "CVE-2023-1389",
+        "severity": "HIGH",
     }
 
-async def fetch_public_osint_pool() -> List[Dict]:
-    raw_pool: List[Dict] = []
-    headers = {"User-Agent": "SOC-ThreatMap-OSINT/1.0"}
 
-    async with httpx.AsyncClient(timeout=12.0, headers=headers, follow_redirects=True) as client:
-        # 1. Feodo Tracker
+async def fetch_public_osint_pool() -> List[Dict]:
+    """
+    Collects active malicious IPs from 4 unauthenticated public OSINT feeds
+    and geolocates up to 200 unique IPs across the globe.
+    """
+    raw_by_ip: Dict[str, Dict] = {}
+    headers = {"User-Agent": "SOC-ThreatMap-OSINT/2.0"}
+
+    async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
+        # 1. abuse.ch Feodo Tracker (Active Botnet C2s)
         try:
             resp = await client.get("https://feodotracker.abuse.ch/downloads/ipblocklist.json")
             if resp.status_code == 200:
                 feodo_data = resp.json()
                 if isinstance(feodo_data, list):
-                    for entry in feodo_data[:100]:
+                    for entry in feodo_data:
                         ip = entry.get("ip_address")
                         if ip:
-                            raw_pool.append({
+                            raw_by_ip[ip] = {
                                 "ip": ip,
                                 "port": int(entry.get("port") or 443),
                                 "raw_name": str(entry.get("malware") or "BOTNET_C2"),
-                                "country_code": (entry.get("country") or "").upper(),
-                            })
+                            }
         except Exception as e:
             logger.warning(f"Feodo Tracker fetch warning: {e}")
 
-        # 2. ThreatFox Export
+        # 2. abuse.ch ThreatFox Public Export (Extracts IPs from both ip:port AND url IOCs)
         try:
             resp = await client.get("https://threatfox.abuse.ch/export/json/recent/")
             if resp.status_code == 200:
@@ -171,48 +170,109 @@ async def fetch_public_osint_pool() -> List[Dict]:
                         if not isinstance(items, list) or not items:
                             continue
                         ioc_obj = items[0]
-                        ioc_val = ioc_obj.get("ioc_value", "")
-                        if ioc_obj.get("ioc_type") == "ip:port" and ":" in ioc_val:
-                            ip_part, port_part = ioc_val.split(":", 1)
-                            raw_pool.append({
+                        ioc_val = str(ioc_obj.get("ioc_value", ""))
+                        match = IPV4_REGEX.search(ioc_val)
+                        if match:
+                            ip_part = match.group(1)
+                            port_part = match.group(2)
+                            malware = ioc_obj.get("malware_printable") or ioc_obj.get("threat_type") or "MALWARE"
+                            if str(malware).lower() in ("unknown", "none", ""):
+                                malware = "PAYLOAD_HOST"
+                            raw_by_ip[ip_part] = {
                                 "ip": ip_part,
-                                "port": int(port_part) if port_part.isdigit() else 443,
-                                "raw_name": str(ioc_obj.get("malware_printable") or "MALWARE"),
-                                "country_code": "",
-                            })
-                            if len(raw_pool) >= 120:
-                                break
+                                "port": int(port_part) if (port_part and port_part.isdigit()) else 80,
+                                "raw_name": str(malware),
+                            }
         except Exception as e:
             logger.warning(f"ThreatFox fetch warning: {e}")
 
-        # 3. Batch Geolocation Enrichment
+        # 3. abuse.ch URLhaus Live Online Malware Distribution Servers
+        try:
+            resp = await client.get("https://urlhaus.abuse.ch/downloads/text_online/")
+            if resp.status_code == 200:
+                lines = resp.text.splitlines()
+                uh_Simple = [l for l in lines if not l.startswith("#") and l.strip()]
+                random.shuffle(uh_Simple)
+                for line in uh_Simple[:150]:
+                    match = IPV4_REGEX.search(line)
+                    if match:
+                        ip_part = match.group(1)
+                        port_part = match.group(2)
+                        if ip_part not in raw_by_ip:
+                            # Infer malware family if present in URL path
+                            lower_url = line.lower()
+                            family = "MALWARE_DROP"
+                            if "mozi" in lower_url:
+                                family = "MOZI_BOTNET"
+                            elif "mirai" in lower_url:
+                                family = "MIRAI"
+                            elif "gafgyt" in lower_url or "bashlite" in lower_url:
+                                family = "GAFGYT"
+                            raw_by_ip[ip_part] = {
+                                "ip": ip_part,
+                                "port": int(port_part) if (port_part and port_part.isdigit()) else 80,
+                                "raw_name": family,
+                            }
+        except Exception as e:
+            logger.warning(f"URLhaus fetch warning: {e}")
+
+        # 4. CINS Active Badguys / Global Intrusion Sensors
+        try:
+            resp = await client.get("https://cinsscore.com/list/ci-badguys.txt")
+            if resp.status_code == 200:
+                ip_lines = [l.strip() for l in resp.text.splitlines() if l.strip() and not l.startswith("#")]
+                random.shuffle(ip_lines)
+                common_ports = [22, 23, 80, 443, 445, 3389, 8080]
+                for ip_str in ip_lines[:100]:
+                    if ip_str not in raw_by_ip:
+                        raw_by_ip[ip_str] = {
+                            "ip": ip_str,
+                            "port": random.choice(common_ports),
+                            "raw_name": "SCANNER",
+                        }
+        except Exception as e:
+            logger.warning(f"CINS feed fetch warning: {e}")
+
+        raw_pool = list(raw_by_ip.values())
+        random.shuffle(raw_pool)
+        logger.info(f"Collected {len(raw_pool)} unique active threat IPs across global OSINT feeds.")
+
+        # Batch Geolocation Enrichment (Up to 200 unique IPs in 2 batches of 100)
         enriched_pool: List[Dict] = []
-        if raw_pool:
-            ips_to_query = list({item["ip"] for item in raw_pool})[:100]
+        for batch_start in (0, 100):
+            batch_slice = raw_pool[batch_start : batch_start + 100]
+            if not batch_slice:
+                break
+            ips_to_query = [item["ip"] for item in batch_slice]
             try:
                 geo_resp = await client.post("http://ip-api.com/batch", json=ips_to_query)
                 if geo_resp.status_code == 200:
                     geo_map = {
                         g["query"]: g
                         for g in geo_resp.json()
-                        if g.get("status") == "success" and g.get("lat") and g.get("lon")
+                        if g.get("status") == "success" and g.get("lat") is not None and g.get("lon") is not None
                     }
-                    for item in raw_pool:
+                    for item in batch_slice:
                         g = geo_map.get(item["ip"])
                         if g:
                             item["srcCountry"] = g.get("country", "Unknown")
                             item["srcCode"] = g.get("countryCode", "un").lower()
-                            item["srcCity"] = g.get("city") or "Host"
+                            item["srcCity"] = g.get("city") or g.get("regionName") or "Host"
                             item["srcAsn"] = (g.get("as") or "AS_EDGE").split(" ")[0]
-                            # EXACT city coordinates from geolocation provider
                             item["srcLat"] = float(g.get("lat"))
                             item["srcLon"] = float(g.get("lon"))
                             enriched_pool.append(item)
-                    logger.info(f"Verified {len(enriched_pool)} real threats with exact city coordinates.")
             except Exception as e:
                 logger.warning(f"Batch geolocation warning: {e}")
+            await asyncio.sleep(1.0)
+
+        distinct_countries = len({i["srcCode"] for i in enriched_pool})
+        logger.info(
+            f"Verified {len(enriched_pool)} real threats across {distinct_countries} distinct countries."
+        )
 
     return enriched_pool
+
 
 async def osint_worker():
     logger.info("Starting OSINT Intelligence Collector...")
@@ -233,7 +293,6 @@ async def osint_worker():
         if ioc_pool:
             item = random.choice(ioc_pool)
 
-            # Precise city coordinates
             src_country = item["srcCountry"]
             src_code = item["srcCode"]
             src_city = item["srcCity"]
@@ -241,7 +300,6 @@ async def osint_worker():
             src_lat = item["srcLat"]
             src_lon = item["srcLon"]
 
-            # Pair with target sensor node in a different country
             targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != src_code]
             dst = random.choice(targets if targets else GLOBAL_SENSOR_NODES)
 
@@ -269,40 +327,16 @@ async def osint_worker():
                 "proto": "TCP",
             }
             await manager.broadcast(event)
-        else:
-            # Fallback using realistic city coordinates
-            cc = random.choice(list(COUNTRY_FALLBACKS.keys()))
-            ref = COUNTRY_FALLBACKS[cc]
-            targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != cc.lower()]
-            dst = random.choice(targets)
-            await manager.broadcast({
-                "srcCountry": ref["country"],
-                "srcCode": cc.lower(),
-                "srcCity": ref["city"],
-                "srcAsn": ref["asn"],
-                "srcLat": ref["lat"],
-                "srcLon": ref["lon"],
-                "dstCountry": dst["country"],
-                "dstCode": dst["code"],
-                "dstCity": dst["city"],
-                "dstLat": dst["lat"],
-                "dstLon": dst["lon"],
-                "malware": "C2_BEACON",
-                "category": "BOTNET_C2",
-                "mitre": "T1071.001",
-                "cve": "CVE-2024-3400",
-                "severity": "CRITICAL",
-                "port": 443,
-                "proto": "TCP",
-            })
 
-        await asyncio.sleep(random.uniform(0.9, 1.9))
+        await asyncio.sleep(random.uniform(0.8, 1.7))
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = asyncio.create_task(osint_worker())
     yield
     task.cancel()
+
 
 app = FastAPI(title="SOC Threat Matrix OSINT Server", lifespan=lifespan)
 
@@ -314,6 +348,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -322,6 +357,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
 
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_path):
