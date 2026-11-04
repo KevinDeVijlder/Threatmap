@@ -12,6 +12,7 @@
   <!-- D3 Geo & TopoJSON -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <link rel="icon" href="/favicon.png" type="image/x-icon">
 </head>
 <body>
   <!-- Floating Country Cursor Tooltip -->
@@ -188,6 +189,74 @@
         </div>
         <div class="leaderboard-bar-track gold-bar-track">
           <div id="dossier-ratio-fill" class="leaderboard-bar-fill gold-bar-fill" style="width: 50%;"></div>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Card 4: Detailed Attack Telemetry Dossier (Shown when a feed attack is clicked) -->
+    <aside id="attack-dossier-card" class="panel-card attack-dossier-card" style="display: none;">
+      <div class="panel-header attack-dossier-header">
+        <span class="panel-tag" id="atk-dossier-header-tag">INTRUSION TELEMETRY // PACKET</span>
+        <button id="btn-close-attack-dossier" class="dossier-close-btn atk-close-btn" type="button" title="Deselect Attack">✕</button>
+      </div>
+
+      <div class="atk-identity-banner">
+        <div class="atk-id-main">
+          <span id="atk-dossier-malware" class="atk-malware-title">MALWARE</span>
+          <span id="atk-dossier-category" class="atk-category-sub">CATEGORY // LIVE FEED</span>
+        </div>
+        <span id="atk-dossier-sev-badge" class="atk-sev-badge">HIGH</span>
+      </div>
+
+      <!-- Full Route Breakdown (Origin -> Target) -->
+      <div class="atk-route-box">
+        <div class="atk-endpoint">
+          <div class="atk-ep-top">
+            <span class="atk-ep-role">ORIGIN HOST</span>
+            <span id="atk-dossier-src-ip" class="atk-ep-ip">0.0.0.0</span>
+          </div>
+          <div class="atk-ep-loc">
+            <img id="atk-dossier-src-flag" class="leaderboard-flag" src="" alt="Origin Flag" />
+            <span id="atk-dossier-src-loc">City, Country (ISO)</span>
+          </div>
+          <span id="atk-dossier-src-coords" class="atk-ep-coords">LAT: 0.0000° | LON: 0.0000°</span>
+        </div>
+
+        <div class="atk-route-divider">
+          <i class="fa-solid fa-angles-down"></i>
+          <span id="atk-dossier-distance">0 KM</span>
+        </div>
+
+        <div class="atk-endpoint">
+          <div class="atk-ep-top">
+            <span class="atk-ep-role">TARGET SENSOR</span>
+            <span id="atk-dossier-dst-port" class="atk-ep-ip">443 / TCP</span>
+          </div>
+          <div class="atk-ep-loc">
+            <img id="atk-dossier-dst-flag" class="leaderboard-flag" src="" alt="Target Flag" />
+            <span id="atk-dossier-dst-loc">City, Country (ISO)</span>
+          </div>
+          <span id="atk-dossier-dst-coords" class="atk-ep-coords">LAT: 0.0000° | LON: 0.0000°</span>
+        </div>
+      </div>
+
+      <!-- Complete Technical Metadata Grid -->
+      <div class="dossier-stats-grid atk-stats-grid">
+        <div class="dossier-stat-box atk-stat-box">
+          <span class="stat-label">VULNERABILITY</span>
+          <span id="atk-dossier-cve" class="stat-value">CVE-N/A</span>
+        </div>
+        <div class="dossier-stat-box atk-stat-box">
+          <span class="stat-label">MITRE ATT&amp;CK</span>
+          <span id="atk-dossier-mitre" class="stat-value">T1071</span>
+        </div>
+        <div class="dossier-stat-box atk-stat-box">
+          <span class="stat-label">ORIGIN ASN</span>
+          <span id="atk-dossier-asn" class="stat-value">AS_EDGE</span>
+        </div>
+        <div class="dossier-stat-box atk-stat-box">
+          <span class="stat-label">CAPTURED AT</span>
+          <span id="atk-dossier-time" class="stat-value">00:00:00 UTC</span>
         </div>
       </div>
     </aside>

@@ -48,36 +48,86 @@ const COUNTRY_LOOKUP = {
   4: { name: "Afghanistan", code: "af" },
   8: { name: "Albania", code: "al" },
   12: { name: "Algeria", code: "dz" },
+  16: { name: "American Samoa", code: "as" },
+  20: { name: "Andorra", code: "ad" },
   24: { name: "Angola", code: "ao" },
+  28: { name: "Antigua and Barbuda", code: "ag" },
+  31: { name: "Azerbaijan", code: "az" },
   32: { name: "Argentina", code: "ar" },
   36: { name: "Australia", code: "au" },
   40: { name: "Austria", code: "at" },
+  44: { name: "Bahamas", code: "bs" },
+  48: { name: "Bahrain", code: "bh" },
   50: { name: "Bangladesh", code: "bd" },
+  51: { name: "Armenia", code: "am" },
+  52: { name: "Barbados", code: "bb" },
   56: { name: "Belgium", code: "be" },
+  60: { name: "Bermuda", code: "bm" },
+  64: { name: "Bhutan", code: "bt" },
   68: { name: "Bolivia", code: "bo" },
+  70: { name: "Bosnia and Herzegovina", code: "ba" },
+  72: { name: "Botswana", code: "bw" },
   76: { name: "Brazil", code: "br" },
+  84: { name: "Belize", code: "bz" },
+  90: { name: "Solomon Islands", code: "sb" },
+  96: { name: "Brunei", code: "bn" },
   100: { name: "Bulgaria", code: "bg" },
+  104: { name: "Myanmar", code: "mm" },
+  108: { name: "Burundi", code: "bi" },
+  112: { name: "Belarus", code: "by" },
+  116: { name: "Cambodia", code: "kh" },
+  120: { name: "Cameroon", code: "cm" },
   124: { name: "Canada", code: "ca" },
+  132: { name: "Cape Verde", code: "cv" },
+  140: { name: "Central African Republic", code: "cf" },
+  144: { name: "Sri Lanka", code: "lk" },
+  148: { name: "Chad", code: "td" },
   152: { name: "Chile", code: "cl" },
   156: { name: "China", code: "cn" },
+  158: { name: "Taiwan", code: "tw" },
   170: { name: "Colombia", code: "co" },
+  174: { name: "Comoros", code: "km" },
+  178: { name: "Republic of the Congo", code: "cg" },
+  180: { name: "DR Congo", code: "cd" },
   188: { name: "Costa Rica", code: "cr" },
   191: { name: "Croatia", code: "hr" },
   192: { name: "Cuba", code: "cu" },
-  203: { name: "Czech Republic", code: "cz" },
+  196: { name: "Cyprus", code: "cy" },
+  203: { name: "Czechia", code: "cz" },
+  204: { name: "Benin", code: "bj" },
   208: { name: "Denmark", code: "dk" },
+  212: { name: "Dominica", code: "dm" },
+  214: { name: "Dominican Republic", code: "do" },
   218: { name: "Ecuador", code: "ec" },
-  818: { name: "Egypt", code: "eg" },
-  233: { name: "Estonia", code: "ee" },
+  222: { name: "El Salvador", code: "sv" },
+  226: { name: "Equatorial Guinea", code: "gq" },
   231: { name: "Ethiopia", code: "et" },
+  232: { name: "Eritrea", code: "er" },
+  233: { name: "Estonia", code: "ee" },
+  238: { name: "Falkland Islands", code: "fk" },
+  242: { name: "Fiji", code: "fj" },
   246: { name: "Finland", code: "fi" },
   250: { name: "France", code: "fr" },
+  254: { name: "French Guiana", code: "gf" },
+  258: { name: "French Polynesia", code: "pf" },
+  260: { name: "French Southern Lands", code: "tf" },
+  262: { name: "Djibouti", code: "dj" },
   266: { name: "Gabon", code: "ga" },
   268: { name: "Georgia", code: "ge" },
+  270: { name: "Gambia", code: "gm" },
+  275: { name: "Palestine", code: "ps" },
   276: { name: "Germany", code: "de" },
   288: { name: "Ghana", code: "gh" },
   300: { name: "Greece", code: "gr" },
+  304: { name: "Greenland", code: "gl" },
+  308: { name: "Grenada", code: "gd" },
+  316: { name: "Guam", code: "gu" },
   320: { name: "Guatemala", code: "gt" },
+  324: { name: "Guinea", code: "gn" },
+  328: { name: "Guyana", code: "gy" },
+  332: { name: "Haiti", code: "ht" },
+  340: { name: "Honduras", code: "hn" },
+  344: { name: "Hong Kong", code: "hk" },
   348: { name: "Hungary", code: "hu" },
   352: { name: "Iceland", code: "is" },
   356: { name: "India", code: "in" },
@@ -87,50 +137,118 @@ const COUNTRY_LOOKUP = {
   372: { name: "Ireland", code: "ie" },
   376: { name: "Israel", code: "il" },
   380: { name: "Italy", code: "it" },
+  384: { name: "Ivory Coast", code: "ci" },
+  388: { name: "Jamaica", code: "jm" },
   392: { name: "Japan", code: "jp" },
-  400: { name: "Jordan", code: "jo" },
   398: { name: "Kazakhstan", code: "kz" },
+  400: { name: "Jordan", code: "jo" },
   404: { name: "Kenya", code: "ke" },
+  408: { name: "North Korea", code: "kp" },
   410: { name: "South Korea", code: "kr" },
   414: { name: "Kuwait", code: "kw" },
+  417: { name: "Kyrgyzstan", code: "kg" },
+  418: { name: "Laos", code: "la" },
+  422: { name: "Lebanon", code: "lb" },
+  426: { name: "Lesotho", code: "ls" },
   428: { name: "Latvia", code: "lv" },
+  430: { name: "Liberia", code: "lr" },
   434: { name: "Libya", code: "ly" },
   440: { name: "Lithuania", code: "lt" },
   442: { name: "Luxembourg", code: "lu" },
+  450: { name: "Madagascar", code: "mg" },
+  454: { name: "Malawi", code: "mw" },
   458: { name: "Malaysia", code: "my" },
+  462: { name: "Maldives", code: "mv" },
+  466: { name: "Mali", code: "ml" },
+  470: { name: "Malta", code: "mt" },
+  478: { name: "Mauritania", code: "mr" },
+  480: { name: "Mauritius", code: "mu" },
   484: { name: "Mexico", code: "mx" },
+  496: { name: "Mongolia", code: "mn" },
+  498: { name: "Moldova", code: "md" },
+  499: { name: "Montenegro", code: "me" },
   504: { name: "Morocco", code: "ma" },
+  508: { name: "Mozambique", code: "mz" },
+  512: { name: "Oman", code: "om" },
+  516: { name: "Namibia", code: "na" },
+  524: { name: "Nepal", code: "np" },
   528: { name: "Netherlands", code: "nl" },
+  540: { name: "New Caledonia", code: "nc" },
+  548: { name: "Vanuatu", code: "vu" },
   554: { name: "New Zealand", code: "nz" },
+  558: { name: "Nicaragua", code: "ni" },
+  562: { name: "Niger", code: "ne" },
   566: { name: "Nigeria", code: "ng" },
   578: { name: "Norway", code: "no" },
   586: { name: "Pakistan", code: "pk" },
+  591: { name: "Panama", code: "pa" },
+  598: { name: "Papua New Guinea", code: "pg" },
+  600: { name: "Paraguay", code: "py" },
   604: { name: "Peru", code: "pe" },
   608: { name: "Philippines", code: "ph" },
   616: { name: "Poland", code: "pl" },
   620: { name: "Portugal", code: "pt" },
+  624: { name: "Guinea-Bissau", code: "gw" },
+  626: { name: "Timor-Leste", code: "tl" },
+  630: { name: "Puerto Rico", code: "pr" },
+  634: { name: "Qatar", code: "qa" },
   642: { name: "Romania", code: "ro" },
   643: { name: "Russia", code: "ru" },
+  646: { name: "Rwanda", code: "rw" },
   682: { name: "Saudi Arabia", code: "sa" },
+  686: { name: "Senegal", code: "sn" },
+  688: { name: "Serbia", code: "rs" },
+  694: { name: "Sierra Leone", code: "sl" },
   702: { name: "Singapore", code: "sg" },
   703: { name: "Slovakia", code: "sk" },
+  704: { name: "Vietnam", code: "vn" },
   705: { name: "Slovenia", code: "si" },
+  706: { name: "Somalia", code: "so" },
   710: { name: "South Africa", code: "za" },
+  716: { name: "Zimbabwe", code: "zw" },
   724: { name: "Spain", code: "es" },
+  728: { name: "South Sudan", code: "ss" },
+  729: { name: "Sudan", code: "sd" },
+  732: { name: "Western Sahara", code: "eh" },
+  740: { name: "Suriname", code: "sr" },
+  748: { name: "Eswatini", code: "sz" },
   752: { name: "Sweden", code: "se" },
   756: { name: "Switzerland", code: "ch" },
+  760: { name: "Syria", code: "sy" },
+  762: { name: "Tajikistan", code: "tj" },
   764: { name: "Thailand", code: "th" },
+  768: { name: "Togo", code: "tg" },
+  780: { name: "Trinidad and Tobago", code: "tt" },
+  784: { name: "United Arab Emirates", code: "ae" },
   788: { name: "Tunisia", code: "tn" },
   792: { name: "Turkey", code: "tr" },
+  795: { name: "Turkmenistan", code: "tm" },
+  800: { name: "Uganda", code: "ug" },
   804: { name: "Ukraine", code: "ua" },
-  784: { name: "United Arab Emirates", code: "ae" },
+  807: { name: "North Macedonia", code: "mk" },
+  818: { name: "Egypt", code: "eg" },
   826: { name: "United Kingdom", code: "gb" },
+  834: { name: "Tanzania", code: "tz" },
   840: { name: "United States", code: "us" },
+  854: { name: "Burkina Faso", code: "bf" },
   858: { name: "Uruguay", code: "uy" },
   860: { name: "Uzbekistan", code: "uz" },
   862: { name: "Venezuela", code: "ve" },
-  704: { name: "Vietnam", code: "vn" }
+  887: { name: "Yemen", code: "ye" },
+  894: { name: "Zambia", code: "zm" }
 };
+
+// Fallback for territories in world-atlas that lack a numeric ISO id
+const NAME_FALLBACK_LOOKUP = {
+  "Kosovo": { name: "Kosovo", code: "xk" },
+  "Somaliland": { name: "Somaliland", code: "so" },
+  "N. Cyprus": { name: "Northern Cyprus", code: "cy" },
+  "W. Sahara": { name: "Western Sahara", code: "eh" },
+  "Falkland Is.": { name: "Falkland Islands", code: "fk" },
+  "Fr. S. Antarctic Lands": { name: "French Southern Lands", code: "tf" }
+};
+
+
 
 class ThreatMap {
   constructor() {
@@ -231,6 +349,27 @@ class ThreatMap {
     this.dossierRatioOutLbl = document.getElementById("dossier-ratio-out-lbl");
     this.dossierRatioInLbl = document.getElementById("dossier-ratio-in-lbl");
     this.dossierRatioFill = document.getElementById("dossier-ratio-fill");
+
+    // Detailed Attack Telemetry Dossier DOM References
+    this.attackDossierCard = document.getElementById("attack-dossier-card");
+    this.atkDossierHeaderTag = document.getElementById("atk-dossier-header-tag");
+    this.btnCloseAttackDossier = document.getElementById("btn-close-attack-dossier");
+    this.atkDossierMalware = document.getElementById("atk-dossier-malware");
+    this.atkDossierCategory = document.getElementById("atk-dossier-category");
+    this.atkDossierSevBadge = document.getElementById("atk-dossier-sev-badge");
+    this.atkDossierSrcIp = document.getElementById("atk-dossier-src-ip");
+    this.atkDossierSrcFlag = document.getElementById("atk-dossier-src-flag");
+    this.atkDossierSrcLoc = document.getElementById("atk-dossier-src-loc");
+    this.atkDossierSrcCoords = document.getElementById("atk-dossier-src-coords");
+    this.atkDossierDistance = document.getElementById("atk-dossier-distance");
+    this.atkDossierDstPort = document.getElementById("atk-dossier-dst-port");
+    this.atkDossierDstFlag = document.getElementById("atk-dossier-dst-flag");
+    this.atkDossierDstLoc = document.getElementById("atk-dossier-dst-loc");
+    this.atkDossierDstCoords = document.getElementById("atk-dossier-dst-coords");
+    this.atkDossierCve = document.getElementById("atk-dossier-cve");
+    this.atkDossierMitre = document.getElementById("atk-dossier-mitre");
+    this.atkDossierAsn = document.getElementById("atk-dossier-asn");
+    this.atkDossierTime = document.getElementById("atk-dossier-time");
 
     this.countryFeatures = [];
     this.featureCollection = null;
@@ -364,11 +503,9 @@ class ThreatMap {
     }
 
     const feature = this.countryFeatures[this.selectedCountryIndex - 1];
-    const numericId = parseInt(feature.id, 10);
-    const meta = COUNTRY_LOOKUP[numericId] || { name: `Territory [${numericId}]`, code: "un" };
-    const code = meta.code.toLowerCase();
+    const meta = this.getCountryMeta(feature) || { name: "Unknown Sector", code: "un", idLabel: "--" };
+    const code = (meta.code || "un").toLowerCase();
 
-    // Calculate Outbound & Inbound hits and rankings
     const sortedOut = Array.from(this.countryStats.values()).sort((a, b) => b.count - a.count);
     const outIdx = sortedOut.findIndex(item => item.code.toLowerCase() === code);
     const outHits = outIdx !== -1 ? sortedOut[outIdx].count : 0;
@@ -384,23 +521,25 @@ class ThreatMap {
       ? ((totalCountryHits / (this.totalAttacksCount * 2)) * 100).toFixed(1)
       : "0.0";
 
-    // Threat Activity Index
     let threatLevel = "LOW ACTIVITY";
     if (outIdx >= 0 && outIdx < 3) threatLevel = "CRITICAL ORIGIN";
     else if (inIdx >= 0 && inIdx < 3) threatLevel = "PRIMARY TARGET";
     else if (totalCountryHits > 25) threatLevel = "ELEVATED";
     else if (totalCountryHits > 0) threatLevel = "ACTIVE NODE";
 
-    // Dominant Malware, MITRE, Port & ASN
     const details = this.countryDetails.get(code);
     const topMalware = details ? this.getTopKey(details.malwareCounts, "SSL_C2_BEACON") : (totalCountryHits > 0 ? "SSL_C2_BEACON" : "NO SIGNATURES");
     const topPort = details ? this.getTopKey(details.portCounts, "443/TCP") : (totalCountryHits > 0 ? "443/TCP" : "--/TCP");
     const topMitre = details ? details.lastMitre : (totalCountryHits > 0 ? "T1071.001" : "N/A");
     const topAsn = details ? details.lastAsn : (totalCountryHits > 0 ? "AS_TRANSIT" : "N/A");
 
-    // Populate Gold Dossier DOM
     this.dossierHeaderTag.textContent = `SECTOR INTELLIGENCE // ${code.toUpperCase()}`;
-    this.dossierFlag.src = `https://flagcdn.com/w80/${code}.png`;
+    if (meta.code) {
+      this.dossierFlag.src = `https://flagcdn.com/w80/${code}.png`;
+      this.dossierFlag.style.display = "block";
+    } else {
+      this.dossierFlag.style.display = "none";
+    }
     this.dossierCountryName.textContent = meta.name.toUpperCase();
     this.dossierIsoSub.textContent = `ISO: ${code.toUpperCase()} // TRAFFIC SHARE: ${globalShare}%`;
     this.dossierThreatBadge.textContent = threatLevel;
@@ -415,7 +554,6 @@ class ThreatMap {
     this.dossierTopPort.textContent = topPort;
     this.dossierTopAsn.textContent = `ASN: ${topAsn}`;
 
-    // Outbound vs Inbound Ratio
     const outPct = totalCountryHits > 0 ? Math.round((outHits / totalCountryHits) * 100) : 50;
     const inPct = totalCountryHits > 0 ? 100 - outPct : 50;
     this.dossierRatioOutLbl.textContent = `OUTBOUND: ${outPct}%`;
@@ -423,6 +561,122 @@ class ThreatMap {
     this.dossierRatioFill.style.width = `${outPct}%`;
 
     this.countryDossierCard.style.display = "flex";
+  }
+
+  /**
+   * Calculates great-circle distance (Haversine formula) in kilometers between origin & target.
+   */
+  calculateDistanceKm(lat1, lon1, lat2, lon2) {
+    const toRad = deg => (deg * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c);
+  }
+
+  /**
+   * Populates and opens (or closes) the Detailed Attack Telemetry Dossier card.
+   */
+  updateAttackDossier() {
+    if (!this.attackDossierCard) return;
+
+    if (!this.selectedAttack) {
+      this.attackDossierCard.style.display = "none";
+      return;
+    }
+
+    const d = this.selectedAttack;
+    const bucket = d._bucket || this.resolveSeverityBucket(d);
+
+    this.attackDossierCard.classList.remove("sev-high", "sev-med", "sev-low");
+    if (bucket === "HIGH") this.attackDossierCard.classList.add("sev-high");
+    else if (bucket === "MEDIUM") this.attackDossierCard.classList.add("sev-med");
+    else this.attackDossierCard.classList.add("sev-low");
+
+    const srcCode = (d.srcCode || "un").toLowerCase();
+    const dstCode = (d.dstCode || "un").toLowerCase();
+    const srcCity = (d.srcCity && d.srcCity !== "Unknown") ? d.srcCity : d.srcCountry;
+    const dstCity = d.dstCity || d.dstCountry;
+    const distKm = this.calculateDistanceKm(d.srcLat, d.srcLon, d.dstLat, d.dstLon);
+    const cveClean = (d.cve || "CVE-N/A").replace(/^CVE:\s*/i, "");
+
+    this.atkDossierHeaderTag.textContent = `INTRUSION TELEMETRY // ID #${d._id.toUpperCase()}`;
+    this.atkDossierMalware.textContent = d.malware || "UNKNOWN_THREAT";
+    this.atkDossierCategory.textContent = `${d.category || "C2_EVENT"} // ${(d.feedMode || "LIVE").toUpperCase()} FEED`;
+    this.atkDossierSevBadge.textContent = `${bucket} (${(d.severity || bucket).toUpperCase()})`;
+
+    this.atkDossierSrcIp.textContent = d.srcIp ? `IP: ${d.srcIp}` : `ASN: ${d.srcAsn || "AS_EDGE"}`;
+    this.atkDossierSrcFlag.src = `https://flagcdn.com/w40/${srcCode}.png`;
+    this.atkDossierSrcLoc.textContent = `${srcCity}, ${d.srcCountry} (${srcCode.toUpperCase()})`;
+    this.atkDossierSrcCoords.textContent = `LAT: ${Number(d.srcLat).toFixed(4)}° | LON: ${Number(d.srcLon).toFixed(4)}°`;
+
+    this.atkDossierDistance.textContent = `VECTOR DISTANCE: ${distKm.toLocaleString()} KM`;
+
+    this.atkDossierDstPort.textContent = `PORT: ${d.port || 443} / ${d.proto || "TCP"}`;
+    this.atkDossierDstFlag.src = `https://flagcdn.com/w40/${dstCode}.png`;
+    this.atkDossierDstLoc.textContent = `${dstCity}, ${d.dstCountry} (${dstCode.toUpperCase()})`;
+    this.atkDossierDstCoords.textContent = `LAT: ${Number(d.dstLat).toFixed(4)}° | LON: ${Number(d.dstLon).toFixed(4)}°`;
+
+    this.atkDossierCve.textContent = cveClean;
+    this.atkDossierMitre.textContent = d.mitre || "T1071";
+    this.atkDossierAsn.textContent = d.srcAsn || "AS_EDGE";
+    this.atkDossierTime.textContent = d._timestamp || "LIVE";
+
+    this.attackDossierCard.style.display = "flex";
+  }
+
+  updateHoverIntel(countryIndex, clientX, clientY) {
+    if (!countryIndex || countryIndex <= 0 || countryIndex > this.countryFeatures.length) {
+      this.cursorTooltip.style.display = "none";
+      this.countryIntelBar.classList.remove("active");
+      this.countryIntelBar.classList.add("idle");
+      this.countryNameEl.textContent = "STANDBY // SENSORS";
+      this.countryCodeEl.textContent = "ISO // NONE";
+      this.countryFlagEl.style.display = "none";
+      this.flagPlaceholderEl.style.display = "block";
+      return;
+    }
+
+    const feature = this.countryFeatures[countryIndex - 1];
+    const meta = this.getCountryMeta(feature);
+
+    this.countryIntelBar.classList.add("active");
+    this.countryIntelBar.classList.remove("idle");
+
+    if (meta && meta.code) {
+      const flagUrl = `https://flagcdn.com/w80/${meta.code.toLowerCase()}.png`;
+
+      this.cursorTooltipFlag.style.display = "block";
+      this.cursorTooltipFlag.src = flagUrl;
+      this.cursorTooltipName.textContent = meta.name.toUpperCase();
+      this.cursorTooltip.style.left = `${clientX}px`;
+      this.cursorTooltip.style.top = `${clientY}px`;
+      this.cursorTooltip.style.display = "flex";
+
+      this.countryNameEl.textContent = meta.name.toUpperCase();
+      this.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} // ID: ${meta.idLabel}`;
+      this.countryFlagEl.src = flagUrl;
+      this.countryFlagEl.onload = () => {
+        this.countryFlagEl.style.display = "block";
+        this.flagPlaceholderEl.style.display = "none";
+      };
+    } else if (meta) {
+      this.cursorTooltipFlag.style.display = "none";
+      this.cursorTooltipName.textContent = meta.name.toUpperCase();
+      this.cursorTooltip.style.left = `${clientX}px`;
+      this.cursorTooltip.style.top = `${clientY}px`;
+      this.cursorTooltip.style.display = "flex";
+
+      this.countryNameEl.textContent = meta.name.toUpperCase();
+      this.countryCodeEl.textContent = `ID: ${meta.idLabel}`;
+      this.countryFlagEl.style.display = "none";
+      this.flagPlaceholderEl.style.display = "block";
+    }
   }
 
   // =====================================================================
@@ -437,6 +691,7 @@ class ThreatMap {
     this.ripples = [];
     this.rawAttackBuffer = [];
     this.selectedAttack = null;
+    this.updateAttackDossier();
 
     if (mode === "live") {
       this.btnModeLive.classList.add("active");
@@ -643,12 +898,13 @@ class ThreatMap {
 
       if (this.selectedAttack && !this.matchesFilterBucket(this.selectedAttack._bucket)) {
         this.selectedAttack = null;
+        this.updateAttackDossier();
       }
 
       this.rebuildTickerFromBuffer();
     });
 
-    // Click on a feed card to lock/highlight its trajectory on the map
+    // Click on a feed card to lock/unlock its trajectory & open/close the Attack Dossier Card
     this.attackTicker.addEventListener("click", (e) => {
       const row = e.target.closest(".ticker-row");
       if (!row) return;
@@ -662,7 +918,17 @@ class ThreatMap {
         this.selectedAttack = found;
       }
       this.syncSelectedCardDOM();
+      this.updateAttackDossier();
     });
+
+    // Close button on the Attack Dossier Card
+    if (this.btnCloseAttackDossier) {
+      this.btnCloseAttackDossier.addEventListener("click", () => {
+        this.selectedAttack = null;
+        this.syncSelectedCardDOM();
+        this.updateAttackDossier();
+      });
+    }
   }
 
   syncSelectedCardDOM() {
@@ -954,6 +1220,7 @@ class ThreatMap {
     const bucket = this.resolveSeverityBucket(data);
     data._id = attackId;
     data._bucket = bucket;
+    data._timestamp = new Date().toTimeString().split(" ")[0] + " UTC";
 
     this.rawAttackBuffer.unshift(data);
     if (this.rawAttackBuffer.length > 100) this.rawAttackBuffer.pop();
@@ -1466,55 +1733,6 @@ class ThreatMap {
     requestAnimationFrame(() => this.animate());
   }
 
-  updateHoverIntel(countryIndex, clientX, clientY) {
-    if (!countryIndex || countryIndex <= 0 || countryIndex > this.countryFeatures.length) {
-      this.cursorTooltip.style.display = "none";
-      this.countryIntelBar.classList.remove("active");
-      this.countryIntelBar.classList.add("idle");
-      this.countryNameEl.textContent = "STANDBY // SENSORS";
-      this.countryCodeEl.textContent = "ISO // NONE";
-      this.countryFlagEl.style.display = "none";
-      this.flagPlaceholderEl.style.display = "block";
-      return;
-    }
-
-    const feature = this.countryFeatures[countryIndex - 1];
-    const numericId = parseInt(feature.id, 10);
-    const meta = COUNTRY_LOOKUP[numericId];
-
-    this.countryIntelBar.classList.add("active");
-    this.countryIntelBar.classList.remove("idle");
-
-    if (meta) {
-      const flagUrl = `https://flagcdn.com/w80/${meta.code.toLowerCase()}.png`;
-
-      this.cursorTooltipFlag.style.display = "block";
-      this.cursorTooltipFlag.src = flagUrl;
-      this.cursorTooltipName.textContent = meta.name.toUpperCase();
-      this.cursorTooltip.style.left = `${clientX}px`;
-      this.cursorTooltip.style.top = `${clientY}px`;
-      this.cursorTooltip.style.display = "flex";
-
-      this.countryNameEl.textContent = meta.name.toUpperCase();
-      this.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} // ID: ${numericId}`;
-      this.countryFlagEl.src = flagUrl;
-      this.countryFlagEl.onload = () => {
-        this.countryFlagEl.style.display = "block";
-        this.flagPlaceholderEl.style.display = "none";
-      };
-    } else {
-      this.cursorTooltipFlag.style.display = "none";
-      this.cursorTooltipName.textContent = `TERRITORY [${numericId}]`;
-      this.cursorTooltip.style.left = `${clientX}px`;
-      this.cursorTooltip.style.top = `${clientY}px`;
-      this.cursorTooltip.style.display = "flex";
-
-      this.countryNameEl.textContent = `TERRITORY [${numericId}]`;
-      this.countryCodeEl.textContent = `GEO_ID: ${numericId}`;
-      this.countryFlagEl.style.display = "none";
-      this.flagPlaceholderEl.style.display = "block";
-    }
-  }
 
   detectCountryAtPoint(mouseX, mouseY) {
     const px = Math.floor(mouseX);
@@ -1550,7 +1768,7 @@ class ThreatMap {
       this.updateCountryDossier();
     });
 
-    // Click on Map Country to select in Gold & open Gold Dossier Card
+    // Click on Map Country to toggle Gold highlight & open/close Gold Dossier Card
     this.canvas.addEventListener("click", (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -1558,7 +1776,12 @@ class ThreatMap {
       const clickedCountryIdx = this.detectCountryAtPoint(mouseX, mouseY);
 
       if (clickedCountryIdx !== null) {
-        this.selectedCountryIndex = clickedCountryIdx;
+        // Clicking the already-selected country unselects it and closes the card
+        if (this.selectedCountryIndex === clickedCountryIdx) {
+          this.selectedCountryIndex = null;
+        } else {
+          this.selectedCountryIndex = clickedCountryIdx;
+        }
         this.updateCountryDossier();
       }
     });
@@ -1599,7 +1822,44 @@ class ThreatMap {
     update();
     setInterval(update, 1000);
   }
+
+  /**
+   * Resolves any TopoJSON country feature into { name, code, idLabel }
+   * using ISO numeric ID first, then feature.properties.name as fallback.
+   */
+  getCountryMeta(feature) {
+    if (!feature) return null;
+    const numericId = parseInt(feature.id, 10);
+    if (!Number.isNaN(numericId) && COUNTRY_LOOKUP[numericId]) {
+      return {
+        name: COUNTRY_LOOKUP[numericId].name,
+        code: COUNTRY_LOOKUP[numericId].code,
+        idLabel: numericId
+      };
+    }
+
+    const propName = feature.properties && feature.properties.name ? feature.properties.name.trim() : "";
+    if (propName && NAME_FALLBACK_LOOKUP[propName]) {
+      return {
+        name: NAME_FALLBACK_LOOKUP[propName].name,
+        code: NAME_FALLBACK_LOOKUP[propName].code,
+        idLabel: Number.isNaN(numericId) ? "EXT" : numericId
+      };
+    }
+
+    if (propName) {
+      return {
+        name: propName,
+        code: null,
+        idLabel: Number.isNaN(numericId) ? "EXT" : numericId
+      };
+    }
+
+    return null;
+  }
 }
+
+
 
 document.addEventListener("DOMContentLoaded", () => {
   window.threatMap = new ThreatMap();

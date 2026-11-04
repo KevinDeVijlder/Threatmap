@@ -828,6 +828,159 @@ html, body {
   box-shadow: 0 0 8px var(--color-gold-glow);
 }
 
+/* =====================================================================
+   CARD 4: DETAILED ATTACK TELEMETRY DOSSIER CARD
+   ===================================================================== */
+.panel-card.attack-dossier-card {
+  --atk-accent: var(--color-primary);
+  border-color: rgba(0, 240, 255, 0.38);
+  border-left: 3px solid var(--atk-accent);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 111, 255, 0.2);
+  animation: slideIn 0.22s ease-out;
+}
+
+.panel-card.attack-dossier-card.sev-high { --atk-accent: var(--color-high); border-color: rgba(255, 94, 54, 0.45); }
+.panel-card.attack-dossier-card.sev-med  { --atk-accent: var(--color-med);  border-color: rgba(255, 184, 0, 0.45); }
+.panel-card.attack-dossier-card.sev-low  { --atk-accent: var(--color-low);  border-color: rgba(0, 163, 255, 0.45); }
+
+.attack-dossier-header .panel-tag {
+  color: var(--atk-accent);
+  font-weight: 700;
+}
+
+.atk-close-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--atk-accent);
+  color: var(--atk-accent);
+}
+.atk-close-btn:hover {
+  background: var(--atk-accent);
+  color: #040d21;
+  box-shadow: 0 0 10px var(--atk-accent);
+}
+
+.atk-identity-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 7px 9px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.atk-id-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atk-malware-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--atk-accent);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atk-category-sub {
+  font-size: 0.48rem;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.06em;
+}
+
+.atk-sev-badge {
+  font-size: 0.50rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--atk-accent);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.atk-route-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(3, 8, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 8px 9px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.atk-endpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.atk-ep-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.atk-ep-role {
+  font-size: 0.46rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.08em;
+}
+
+.atk-ep-ip {
+  font-size: 0.54rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.atk-ep-loc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.60rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.atk-ep-coords {
+  font-size: 0.48rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.atk-route-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+  padding: 3px 4px;
+  font-size: 0.48rem;
+  font-weight: 700;
+  color: var(--atk-accent);
+}
+
+.atk-stats-grid {
+  margin-bottom: 0;
+}
+
+.dossier-stat-box.atk-stat-box {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dossier-stat-box.atk-stat-box .stat-value {
+  color: #ffffff;
+  text-shadow: none;
+  font-size: 0.60rem;
+}
+
 /* Modal Styles */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(2, 6, 16, 0.82);

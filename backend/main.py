@@ -1,8 +1,10 @@
 """
-SOC Threat Matrix - OSINT Streamer, Custom Feed Parser & SQLite Auth Backend
-============================================================================
+SOC Threat Matrix - OSINT Streamer, Dynamic Target Resolver & SQLite Auth Backend
+=================================================================================
 - SQLite Database (soc_matrix.db): Stores users, PBKDF2 password hashes,
   uploaded profile avatars (Base64), session tokens, and custom SOC intel feeds.
+- Dynamic Global Target Discovery: Resolves real cities and countries worldwide
+  via ip-api.com batch geolocation with zero hardcoded destination lists.
 - Per-Client WebSocket Routing:
   * "live" mode streams global public OSINT feeds (Feodo, ThreatFox, URLhaus, CINS).
   * "custom" mode streams only indicators parsed from the logged-in user's custom feeds.
@@ -138,25 +140,8 @@ class CustomSourcesUpdateRequest(BaseModel):
 
 
 # =====================================================================
-# OSINT GEOGRAPHY & TAXONOMY DATA
+# OSINT THREAT TAXONOMY & SIGNATURES
 # =====================================================================
-
-GLOBAL_SENSOR_NODES = [
-    {"country": "United States", "code": "us", "city": "Ashburn", "lat": 39.0438, "lon": -77.4874},
-    {"country": "United States", "code": "us", "city": "San Francisco", "lat": 37.7749, "lon": -122.4194},
-    {"country": "Germany", "code": "de", "city": "Frankfurt", "lat": 50.1109, "lon": 8.6821},
-    {"country": "Netherlands", "code": "nl", "city": "Amsterdam", "lat": 52.3676, "lon": 4.9041},
-    {"country": "Belgium", "code": "be", "city": "Brussels", "lat": 50.8503, "lon": 4.3517},
-    {"country": "Japan", "code": "jp", "city": "Tokyo", "lat": 35.6762, "lon": 139.6503},
-    {"country": "Singapore", "code": "sg", "city": "Singapore", "lat": 1.3521, "lon": 103.8198},
-    {"country": "United Kingdom", "code": "gb", "city": "London", "lat": 51.5074, "lon": -0.1278},
-    {"country": "Australia", "code": "au", "city": "Sydney", "lat": -33.8688, "lon": 151.2093},
-    {"country": "France", "code": "fr", "city": "Paris", "lat": 48.8566, "lon": 2.3522},
-    {"country": "Canada", "code": "ca", "city": "Toronto", "lat": 43.6532, "lon": -79.3832},
-    {"country": "Sweden", "code": "se", "city": "Stockholm", "lat": 59.3293, "lon": 18.0686},
-    {"country": "Brazil", "code": "br", "city": "São Paulo", "lat": -23.5505, "lon": -46.6333},
-    {"country": "South Korea", "code": "kr", "city": "Seoul", "lat": 37.5665, "lon": 126.9780},
-]
 
 THREAT_TAXONOMY = {
     "COBALT_STRIKE": {"category": "C2_BEACON", "mitre": "T1071.001", "cve": "CVE-2022-30190", "severity": "CRITICAL"},
@@ -177,13 +162,13 @@ THREAT_TAXONOMY = {
 }
 
 PORT_SIGNATURES = {
-    22: {"category": "BRUTE_FORCE", "mitre": "T1110.001", "cve": "CVE-2024-6387", "name": "OPENSSH_SCAN", "severity": "HIGH"},
-    23: {"category": "IOT_PROBE", "mitre": "T1110.001", "cve": "CVE-2022-26134", "name": "TELNET_BRUTE", "severity": "MEDIUM"},
-    80: {"category": "WEB_EXPLOIT", "mitre": "T1190", "cve": "CVE-2021-44228", "name": "HTTP_PAYLOAD", "severity": "HIGH"},
+    22: {"category": "BRUTE_FORCE", "mitre": "T1110.001", "cve": "CVE-2024-6387", "name": "OPENSSH_SCAN", "severity": "LOW"},
+    23: {"category": "IOT_PROBE", "mitre": "T1110.001", "cve": "CVE-2022-26134", "name": "TELNET_BRUTE", "severity": "LOW"},
+    80: {"category": "WEB_EXPLOIT", "mitre": "T1190", "cve": "CVE-2021-44228", "name": "HTTP_PAYLOAD", "severity": "MEDIUM"},
     443: {"category": "C2_TUNNEL", "mitre": "T1071.001", "cve": "CVE-2024-3400", "name": "SSL_C2_BEACON", "severity": "CRITICAL"},
     445: {"category": "SMB_LATERAL", "mitre": "T1021.002", "cve": "CVE-2017-0144", "name": "ETERNALBLUE", "severity": "CRITICAL"},
     3389: {"category": "REMOTE_ACCESS", "mitre": "T1021.001", "cve": "CVE-2019-0708", "name": "BLUEKEEP_PROBE", "severity": "HIGH"},
-    8080: {"category": "PROXY_SCAN", "mitre": "T1190", "cve": "CVE-2023-34362", "name": "HTTP_PROXY_EXP", "severity": "HIGH"},
+    8080: {"category": "PROXY_SCAN", "mitre": "T1190", "cve": "CVE-2023-34362", "name": "HTTP_PROXY_EXP", "severity": "MEDIUM"},
 }
 
 
@@ -307,6 +292,45 @@ async def geolocate_raw_pool(client: httpx.AsyncClient, raw_pool: List[Dict], ma
     return enriched_pool
 
 
+def generate_random_public_ips(count: int = 100) -> List[str]:
+    """Generates random routable public IPv4 addresses across global RIR blocks."""
+    ips = []
+    excluded_first = {0, 10, 100, 127, 169, 172, 192, 198, 203, 224, 240, 255}
+    while len(ips) < count:
+        o1 = random.randint(1, 223)
+        if o1 in excluded_first:
+            continue
+        ips.append(f"{o1}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}")
+    return ips
+
+
+async def fetch_dynamic_target_pool() -> List[Dict]:
+    """
+    Dynamically resolves real cities and countries worldwide via ip-api.com
+    so target destinations cover the entire globe with zero hardcoded cities.
+    """
+    raw_targets = [{"ip": ip} for ip in generate_random_public_ips(100)]
+    headers = {"User-Agent": "SOC-ThreatMap-OSINT/2.0"}
+    async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+        enriched = await geolocate_raw_pool(client, raw_targets, max_ips=100)
+        target_nodes = [
+            {
+                "country": item["srcCountry"],
+                "code": item["srcCode"],
+                "city": item["srcCity"],
+                "lat": item["srcLat"],
+                "lon": item["srcLon"],
+            }
+            for item in enriched
+            if item.get("srcCountry") != "Unknown"
+        ]
+        logger.info(
+            f"Resolved {len(target_nodes)} dynamic target cities across "
+            f"{len({t['code'] for t in target_nodes})} countries."
+        )
+        return target_nodes
+
+
 async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
     """
     Fetches and geolocates IPs from the user's configured custom_sources.
@@ -333,7 +357,7 @@ async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
             if not feed_url:
                 continue
 
-            # Check if the user entered a direct IPv4 address or IP:Port instead of a URL
+            # Direct IPv4 or IP:Port entry
             direct_match = IPV4_REGEX.fullmatch(feed_url)
             if direct_match:
                 ip_part = direct_match.group(1)
@@ -345,7 +369,7 @@ async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
                 }
                 continue
 
-            # Otherwise fetch the remote feed URL and extract IPv4 indicators
+            # Remote feed URL
             fetch_url = feed_url if feed_url.startswith(("http://", "https://")) else f"https://{feed_url}"
             try:
                 resp = await client.get(fetch_url)
@@ -490,7 +514,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
     return enriched_pool
 
 
-def build_attack_event(item: Dict, feed_mode: str = "live") -> Dict:
+def build_attack_event(item: Dict, target_pool: List[Dict], feed_mode: str = "live") -> Dict:
     src_country = item["srcCountry"]
     src_code = item["srcCode"]
     src_city = item["srcCity"]
@@ -498,14 +522,15 @@ def build_attack_event(item: Dict, feed_mode: str = "live") -> Dict:
     src_lat = item["srcLat"]
     src_lon = item["srcLon"]
 
-    targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != src_code]
-    dst = random.choice(targets if targets else GLOBAL_SENSOR_NODES)
+    candidates = [n for n in target_pool if n["code"] != src_code]
+    dst = random.choice(candidates if candidates else target_pool)
 
     port = item.get("port", 443)
     intel = enrich_threat_metadata(item.get("raw_name", ""), port)
 
     return {
         "feedMode": feed_mode,
+        "srcIp": item.get("ip", "N/A"),
         "srcCountry": src_country,
         "srcCode": src_code,
         "srcCity": src_city,
@@ -530,26 +555,46 @@ def build_attack_event(item: Dict, feed_mode: str = "live") -> Dict:
 async def osint_worker():
     logger.info("Starting OSINT Intelligence Collector...")
     ioc_pool: List[Dict] = []
+    target_pool: List[Dict] = []
     last_fetch_time = 0.0
 
     while True:
         now = asyncio.get_event_loop().time()
 
-        # 1. Refresh public live pool every 10 minutes
-        if not ioc_pool or (now - last_fetch_time > 600):
-            fresh_pool = await fetch_public_osint_pool()
-            if fresh_pool:
-                ioc_pool = fresh_pool
+        # Refresh both the live attacker pool and dynamic global target cities every 10 minutes
+        if not ioc_pool or not target_pool or (now - last_fetch_time > 600):
+            fresh_iocs = await fetch_public_osint_pool()
+            await asyncio.sleep(1.2)
+            fresh_targets = await fetch_dynamic_target_pool()
+
+            if fresh_iocs:
+                ioc_pool = fresh_iocs
+            if fresh_targets:
+                target_pool = fresh_targets
+            elif fresh_iocs and not target_pool:
+                # Fallback to geolocated nodes from the IOC pool if ip-api rate-limits target batch
+                target_pool = [
+                    {
+                        "country": x["srcCountry"],
+                        "code": x["srcCode"],
+                        "city": x["srcCity"],
+                        "lat": x["srcLat"],
+                        "lon": x["srcLon"],
+                    }
+                    for x in fresh_iocs
+                ]
+
+            if ioc_pool and target_pool:
                 last_fetch_time = now
             else:
                 last_fetch_time = now - 570
 
-        # 2. Broadcast to clients in LIVE mode
-        if ioc_pool:
+        # Broadcast to clients in LIVE mode
+        if ioc_pool and target_pool:
             live_item = random.choice(ioc_pool)
-            await manager.broadcast_live(build_attack_event(live_item, feed_mode="live"))
+            await manager.broadcast_live(build_attack_event(live_item, target_pool, feed_mode="live"))
 
-        # 3. Stream custom feed events to authenticated clients in CUSTOM mode
+        # Stream custom feed events to authenticated clients in CUSTOM mode
         custom_clients = [
             (ws, meta["user_id"])
             for ws, meta in list(manager.clients.items())
@@ -557,9 +602,11 @@ async def osint_worker():
         ]
         for ws, user_id in custom_clients:
             user_pool = await fetch_custom_user_pool(user_id)
-            if user_pool:
+            if user_pool and target_pool:
                 custom_item = random.choice(user_pool)
-                await manager.send_to_client(ws, build_attack_event(custom_item, feed_mode="custom"))
+                await manager.send_to_client(
+                    ws, build_attack_event(custom_item, target_pool, feed_mode="custom")
+                )
 
         await asyncio.sleep(random.uniform(0.8, 1.7))
 
