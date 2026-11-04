@@ -1,0 +1,19 @@
+# SQLite Database & Temporary Journal Files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backend/soc_matrix.db
+
+# Python Virtual Environment & Bytecode
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/

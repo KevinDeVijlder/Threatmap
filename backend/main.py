@@ -1,34 +1,146 @@
 """
-SOC Threat Matrix - High-Volume OSINT Ingestion & WebSocket Streamer
-====================================================================
-- Ingests live indicators from:
-  1. abuse.ch Feodo Tracker (Botnet C2s)
-  2. abuse.ch ThreatFox (ip:port & URL-based malware hosts)
-  3. abuse.ch URLhaus Online Payloads (Global malware distribution servers)
-  4. CINS Score / Active Scanner Intelligence
-- Geocodes up to 200 unique IPs per cycle to exact city-level coordinates.
+SOC Threat Matrix - OSINT Streamer, Custom Feed Parser & SQLite Auth Backend
+============================================================================
+- SQLite Database (soc_matrix.db): Stores users, PBKDF2 password hashes,
+  uploaded profile avatars (Base64), session tokens, and custom SOC intel feeds.
+- Per-Client WebSocket Routing:
+  * "live" mode streams global public OSINT feeds (Feodo, ThreatFox, URLhaus, CINS).
+  * "custom" mode streams only indicators parsed from the logged-in user's custom feeds.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import random
 import re
+import secrets
+import sqlite3
+import time
 from contextlib import asynccontextmanager
-from typing import Dict, List
+from typing import Dict, List, Optional
+
 import httpx
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("OSINT_ENGINE")
 
-# Regex to extract IPv4 and optional port from raw IOCs and URLs
+DB_PATH = os.path.join(os.path.dirname(__file__), "soc_matrix.db")
 IPV4_REGEX = re.compile(r"(?:https?://)?(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?")
 
-# Exact Destination Sensor Nodes
+
+# =====================================================================
+# SQLITE DATABASE INITIALIZATION & HELPERS
+# =====================================================================
+
+def init_db():
+    """Creates the SQLite database tables for users and sessions if they do not exist."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            avatar TEXT DEFAULT '',
+            custom_sources TEXT DEFAULT '[]',
+            created_at REAL NOT NULL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at REAL NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+    logger.info(f"SQLite database initialized at {DB_PATH}")
+
+
+def hash_password(password: str, salt: str) -> str:
+    """Hashes a password using PBKDF2-HMAC-SHA256."""
+    return hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000
+    ).hex()
+
+
+def get_user_by_raw_token(token: Optional[str]) -> Optional[Dict]:
+    """Resolves a raw session token into a user dictionary."""
+    if not token:
+        return None
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT u.id, u.username, u.avatar, u.custom_sources
+        FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.token = ?
+    """, (token.strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "avatar": row["avatar"] or "",
+        "custom_sources": json.loads(row["custom_sources"] or "[]"),
+    }
+
+
+def get_user_by_token(authorization: Optional[str]) -> Optional[Dict]:
+    """Resolves a Bearer token from the HTTP Authorization header."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    return get_user_by_raw_token(token)
+
+
+def get_user_custom_sources(user_id: int) -> List[Dict]:
+    """Fetches the latest custom_sources list for a specific user_id from SQLite."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT custom_sources FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return []
+    return json.loads(row["custom_sources"] or "[]")
+
+
+# =====================================================================
+# PYDANTIC REQUEST MODELS
+# =====================================================================
+
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+    avatar: Optional[str] = ""
+
+
+class AvatarUpdateRequest(BaseModel):
+    avatar: str
+
+
+class CustomSourcesUpdateRequest(BaseModel):
+    custom_sources: List[Dict[str, str]]
+
+
+# =====================================================================
+# OSINT GEOGRAPHY & TAXONOMY DATA
+# =====================================================================
+
 GLOBAL_SENSOR_NODES = [
     {"country": "United States", "code": "us", "city": "Ashburn", "lat": 39.0438, "lon": -77.4874},
     {"country": "United States", "code": "us", "city": "San Francisco", "lat": 37.7749, "lon": -122.4194},
@@ -75,29 +187,57 @@ PORT_SIGNATURES = {
 }
 
 
+# =====================================================================
+# WEBSOCKET CONNECTION & MODE MANAGER
+# =====================================================================
+
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        # Maps WebSocket -> {"mode": "live" | "custom", "user_id": Optional[int]}
+        self.clients: Dict[WebSocket, Dict] = {}
+        # Cache of geolocated custom pools per user_id: {user_id: {"pool": [...], "ts": float, "hash": str}}
+        self.user_custom_pools: Dict[int, Dict] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
-        logger.info(f"Client connected. Active listeners: {len(self.active_connections)}")
+        self.clients[websocket] = {"mode": "live", "user_id": None}
+        logger.info(f"Client connected. Active listeners: {len(self.clients)}")
 
     def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-            logger.info(f"Client disconnected. Active listeners: {len(self.active_connections)}")
+        if websocket in self.clients:
+            del self.clients[websocket]
+            logger.info(f"Client disconnected. Active listeners: {len(self.clients)}")
 
-    async def broadcast(self, message: dict):
-        if not self.active_connections:
+    def set_client_mode(self, websocket: WebSocket, mode: str, token: Optional[str]):
+        if websocket not in self.clients:
             return
+        user = get_user_by_raw_token(token) if token else None
+        if mode == "custom" and user:
+            self.clients[websocket] = {"mode": "custom", "user_id": user["id"]}
+            logger.info(f"User '{user['username']}' switched WebSocket to CUSTOM INTEL mode.")
+        else:
+            self.clients[websocket] = {"mode": "live", "user_id": user["id"] if user else None}
+            logger.info("Client switched WebSocket to LIVE INTEL mode.")
+
+    def invalidate_user_cache(self, user_id: int):
+        if user_id in self.user_custom_pools:
+            del self.user_custom_pools[user_id]
+
+    async def broadcast_live(self, message: dict):
+        """Sends live OSINT events ONLY to clients currently in 'live' mode."""
         payload = json.dumps(message)
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_text(payload)
-            except Exception:
-                self.disconnect(connection)
+        for ws, meta in list(self.clients.items()):
+            if meta.get("mode") == "live":
+                try:
+                    await ws.send_text(payload)
+                except Exception:
+                    self.disconnect(ws)
+
+    async def send_to_client(self, ws: WebSocket, message: dict):
+        try:
+            await ws.send_text(json.dumps(message))
+        except Exception:
+            self.disconnect(ws)
 
 
 manager = ConnectionManager()
@@ -126,24 +266,130 @@ def enrich_threat_metadata(raw_name: str, port: int) -> Dict:
         }
 
     return {
-        "malware": upper_name[:16] if upper_name else "MALICIOUS_HOST",
-        "category": "MALWARE_DROP",
-        "mitre": "T1190",
-        "cve": "CVE-2023-1389",
+        "malware": upper_name[:16] if upper_name else "CUSTOM_IOC",
+        "category": "CUSTOM_INTEL",
+        "mitre": "T1071",
+        "cve": "CVE-CUSTOM",
         "severity": "HIGH",
     }
 
 
+async def geolocate_raw_pool(client: httpx.AsyncClient, raw_pool: List[Dict], max_ips: int = 100) -> List[Dict]:
+    """Batch geolocates a list of raw IP dictionaries using ip-api.com."""
+    enriched_pool: List[Dict] = []
+    for batch_start in range(0, min(len(raw_pool), max_ips), 100):
+        batch_slice = raw_pool[batch_start : batch_start + 100]
+        if not batch_slice:
+            break
+        ips_to_query = [item["ip"] for item in batch_slice]
+        try:
+            geo_resp = await client.post("http://ip-api.com/batch", json=ips_to_query)
+            if geo_resp.status_code == 200:
+                geo_map = {
+                    g["query"]: g
+                    for g in geo_resp.json()
+                    if g.get("status") == "success" and g.get("lat") is not None and g.get("lon") is not None
+                }
+                for item in batch_slice:
+                    g = geo_map.get(item["ip"])
+                    if g:
+                        item["srcCountry"] = g.get("country", "Unknown")
+                        item["srcCode"] = g.get("countryCode", "un").lower()
+                        item["srcCity"] = g.get("city") or g.get("regionName") or "Host"
+                        item["srcAsn"] = (g.get("as") or "AS_EDGE").split(" ")[0]
+                        item["srcLat"] = float(g.get("lat"))
+                        item["srcLon"] = float(g.get("lon"))
+                        enriched_pool.append(item)
+        except Exception as e:
+            logger.warning(f"Batch geolocation warning: {e}")
+        if max_ips > 100:
+            await asyncio.sleep(1.0)
+    return enriched_pool
+
+
+async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
+    """
+    Fetches and geolocates IPs from the user's configured custom_sources.
+    Supports both remote feed URLs (plain text, JSON, CSV) and direct IPv4 entries.
+    """
+    sources = get_user_custom_sources(user_id)
+    if not sources:
+        return []
+
+    sources_hash = json.dumps(sources, sort_keys=True)
+    cached = manager.user_custom_pools.get(user_id)
+    now = time.time()
+    if cached and cached["hash"] == sources_hash and (now - cached["ts"] < 300):
+        return cached["pool"]
+
+    raw_by_ip: Dict[str, Dict] = {}
+    headers = {"User-Agent": "SOC-ThreatMap-Custom/2.0"}
+    common_ports = [22, 80, 443, 445, 3389, 8080]
+
+    async with httpx.AsyncClient(timeout=10.0, headers=headers, follow_redirects=True) as client:
+        for src in sources:
+            feed_name = (src.get("name") or "CUSTOM_FEED").upper().replace(" ", "_")[:16]
+            feed_url = (src.get("url") or "").strip()
+            if not feed_url:
+                continue
+
+            # Check if the user entered a direct IPv4 address or IP:Port instead of a URL
+            direct_match = IPV4_REGEX.fullmatch(feed_url)
+            if direct_match:
+                ip_part = direct_match.group(1)
+                port_part = direct_match.group(2)
+                raw_by_ip[ip_part] = {
+                    "ip": ip_part,
+                    "port": int(port_part) if (port_part and port_part.isdigit()) else 443,
+                    "raw_name": feed_name,
+                }
+                continue
+
+            # Otherwise fetch the remote feed URL and extract IPv4 indicators
+            fetch_url = feed_url if feed_url.startswith(("http://", "https://")) else f"https://{feed_url}"
+            try:
+                resp = await client.get(fetch_url)
+                if resp.status_code == 200:
+                    lines = resp.text.splitlines()
+                    random.shuffle(lines)
+                    for line in lines:
+                        if line.startswith("#") or not line.strip():
+                            continue
+                        for match in IPV4_REGEX.finditer(line):
+                            ip_part = match.group(1)
+                            port_part = match.group(2)
+                            if ip_part not in raw_by_ip:
+                                raw_by_ip[ip_part] = {
+                                    "ip": ip_part,
+                                    "port": int(port_part) if (port_part and port_part.isdigit()) else random.choice(common_ports),
+                                    "raw_name": feed_name,
+                                }
+                            if len(raw_by_ip) >= 100:
+                                break
+                        if len(raw_by_ip) >= 100:
+                            break
+            except Exception as e:
+                logger.warning(f"Custom feed '{feed_name}' ({fetch_url}) fetch warning: {e}")
+
+        raw_pool = list(raw_by_ip.values())
+        random.shuffle(raw_pool)
+        enriched = await geolocate_raw_pool(client, raw_pool, max_ips=100) if raw_pool else []
+
+    manager.user_custom_pools[user_id] = {
+        "pool": enriched,
+        "ts": now,
+        "hash": sources_hash,
+    }
+    logger.info(f"Loaded {len(enriched)} custom indicators for user_id={user_id}.")
+    return enriched
+
+
 async def fetch_public_osint_pool() -> List[Dict]:
-    """
-    Collects active malicious IPs from 4 unauthenticated public OSINT feeds
-    and geolocates up to 200 unique IPs across the globe.
-    """
     raw_by_ip: Dict[str, Dict] = {}
     headers = {"User-Agent": "SOC-ThreatMap-OSINT/2.0"}
 
     async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
-        # 1. abuse.ch Feodo Tracker (Active Botnet C2s)
+        # 1. Feodo Tracker
         try:
             resp = await client.get("https://feodotracker.abuse.ch/downloads/ipblocklist.json")
             if resp.status_code == 200:
@@ -160,7 +406,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
         except Exception as e:
             logger.warning(f"Feodo Tracker fetch warning: {e}")
 
-        # 2. abuse.ch ThreatFox Public Export (Extracts IPs from both ip:port AND url IOCs)
+        # 2. ThreatFox Public Export
         try:
             resp = await client.get("https://threatfox.abuse.ch/export/json/recent/")
             if resp.status_code == 200:
@@ -186,20 +432,18 @@ async def fetch_public_osint_pool() -> List[Dict]:
         except Exception as e:
             logger.warning(f"ThreatFox fetch warning: {e}")
 
-        # 3. abuse.ch URLhaus Live Online Malware Distribution Servers
+        # 3. URLhaus Live Online Servers
         try:
             resp = await client.get("https://urlhaus.abuse.ch/downloads/text_online/")
             if resp.status_code == 200:
-                lines = resp.text.splitlines()
-                uh_Simple = [l for l in lines if not l.startswith("#") and l.strip()]
-                random.shuffle(uh_Simple)
-                for line in uh_Simple[:150]:
+                lines = [l for l in resp.text.splitlines() if not l.startswith("#") and l.strip()]
+                random.shuffle(lines)
+                for line in lines[:150]:
                     match = IPV4_REGEX.search(line)
                     if match:
                         ip_part = match.group(1)
                         port_part = match.group(2)
                         if ip_part not in raw_by_ip:
-                            # Infer malware family if present in URL path
                             lower_url = line.lower()
                             family = "MALWARE_DROP"
                             if "mozi" in lower_url:
@@ -216,7 +460,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
         except Exception as e:
             logger.warning(f"URLhaus fetch warning: {e}")
 
-        # 4. CINS Active Badguys / Global Intrusion Sensors
+        # 4. CINS Active Badguys
         try:
             resp = await client.get("https://cinsscore.com/list/ci-badguys.txt")
             if resp.status_code == 200:
@@ -237,41 +481,50 @@ async def fetch_public_osint_pool() -> List[Dict]:
         random.shuffle(raw_pool)
         logger.info(f"Collected {len(raw_pool)} unique active threat IPs across global OSINT feeds.")
 
-        # Batch Geolocation Enrichment (Up to 200 unique IPs in 2 batches of 100)
-        enriched_pool: List[Dict] = []
-        for batch_start in (0, 100):
-            batch_slice = raw_pool[batch_start : batch_start + 100]
-            if not batch_slice:
-                break
-            ips_to_query = [item["ip"] for item in batch_slice]
-            try:
-                geo_resp = await client.post("http://ip-api.com/batch", json=ips_to_query)
-                if geo_resp.status_code == 200:
-                    geo_map = {
-                        g["query"]: g
-                        for g in geo_resp.json()
-                        if g.get("status") == "success" and g.get("lat") is not None and g.get("lon") is not None
-                    }
-                    for item in batch_slice:
-                        g = geo_map.get(item["ip"])
-                        if g:
-                            item["srcCountry"] = g.get("country", "Unknown")
-                            item["srcCode"] = g.get("countryCode", "un").lower()
-                            item["srcCity"] = g.get("city") or g.get("regionName") or "Host"
-                            item["srcAsn"] = (g.get("as") or "AS_EDGE").split(" ")[0]
-                            item["srcLat"] = float(g.get("lat"))
-                            item["srcLon"] = float(g.get("lon"))
-                            enriched_pool.append(item)
-            except Exception as e:
-                logger.warning(f"Batch geolocation warning: {e}")
-            await asyncio.sleep(1.0)
-
+        enriched_pool = await geolocate_raw_pool(client, raw_pool, max_ips=200)
         distinct_countries = len({i["srcCode"] for i in enriched_pool})
         logger.info(
             f"Verified {len(enriched_pool)} real threats across {distinct_countries} distinct countries."
         )
 
     return enriched_pool
+
+
+def build_attack_event(item: Dict, feed_mode: str = "live") -> Dict:
+    src_country = item["srcCountry"]
+    src_code = item["srcCode"]
+    src_city = item["srcCity"]
+    src_asn = item["srcAsn"]
+    src_lat = item["srcLat"]
+    src_lon = item["srcLon"]
+
+    targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != src_code]
+    dst = random.choice(targets if targets else GLOBAL_SENSOR_NODES)
+
+    port = item.get("port", 443)
+    intel = enrich_threat_metadata(item.get("raw_name", ""), port)
+
+    return {
+        "feedMode": feed_mode,
+        "srcCountry": src_country,
+        "srcCode": src_code,
+        "srcCity": src_city,
+        "srcAsn": src_asn,
+        "srcLat": src_lat,
+        "srcLon": src_lon,
+        "dstCountry": dst["country"],
+        "dstCode": dst["code"],
+        "dstCity": dst["city"],
+        "dstLat": dst["lat"],
+        "dstLon": dst["lon"],
+        "malware": intel["malware"],
+        "category": intel["category"],
+        "mitre": intel["mitre"],
+        "cve": intel["cve"],
+        "severity": intel["severity"],
+        "port": port,
+        "proto": "TCP",
+    }
 
 
 async def osint_worker():
@@ -282,6 +535,7 @@ async def osint_worker():
     while True:
         now = asyncio.get_event_loop().time()
 
+        # 1. Refresh public live pool every 10 minutes
         if not ioc_pool or (now - last_fetch_time > 600):
             fresh_pool = await fetch_public_osint_pool()
             if fresh_pool:
@@ -290,49 +544,29 @@ async def osint_worker():
             else:
                 last_fetch_time = now - 570
 
+        # 2. Broadcast to clients in LIVE mode
         if ioc_pool:
-            item = random.choice(ioc_pool)
+            live_item = random.choice(ioc_pool)
+            await manager.broadcast_live(build_attack_event(live_item, feed_mode="live"))
 
-            src_country = item["srcCountry"]
-            src_code = item["srcCode"]
-            src_city = item["srcCity"]
-            src_asn = item["srcAsn"]
-            src_lat = item["srcLat"]
-            src_lon = item["srcLon"]
-
-            targets = [n for n in GLOBAL_SENSOR_NODES if n["code"] != src_code]
-            dst = random.choice(targets if targets else GLOBAL_SENSOR_NODES)
-
-            port = item.get("port", 443)
-            intel = enrich_threat_metadata(item.get("raw_name", ""), port)
-
-            event = {
-                "srcCountry": src_country,
-                "srcCode": src_code,
-                "srcCity": src_city,
-                "srcAsn": src_asn,
-                "srcLat": src_lat,
-                "srcLon": src_lon,
-                "dstCountry": dst["country"],
-                "dstCode": dst["code"],
-                "dstCity": dst["city"],
-                "dstLat": dst["lat"],
-                "dstLon": dst["lon"],
-                "malware": intel["malware"],
-                "category": intel["category"],
-                "mitre": intel["mitre"],
-                "cve": intel["cve"],
-                "severity": intel["severity"],
-                "port": port,
-                "proto": "TCP",
-            }
-            await manager.broadcast(event)
+        # 3. Stream custom feed events to authenticated clients in CUSTOM mode
+        custom_clients = [
+            (ws, meta["user_id"])
+            for ws, meta in list(manager.clients.items())
+            if meta.get("mode") == "custom" and meta.get("user_id") is not None
+        ]
+        for ws, user_id in custom_clients:
+            user_pool = await fetch_custom_user_pool(user_id)
+            if user_pool:
+                custom_item = random.choice(user_pool)
+                await manager.send_to_client(ws, build_attack_event(custom_item, feed_mode="custom"))
 
         await asyncio.sleep(random.uniform(0.8, 1.7))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     task = asyncio.create_task(osint_worker())
     yield
     task.cancel()
@@ -349,12 +583,152 @@ app.add_middleware(
 )
 
 
+# =====================================================================
+# AUTHENTICATION & USER PROFILE API ROUTES
+# =====================================================================
+
+@app.post("/api/register")
+async def register_user(req: AuthRequest):
+    username = req.username.strip()
+    if len(username) < 3 or len(req.password) < 4:
+        raise HTTPException(status_code=400, detail="Username (min 3) and password (min 4) required.")
+
+    salt = secrets.token_hex(16)
+    pwd_hash = hash_password(req.password, salt)
+    now = time.time()
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password_hash, salt, avatar, custom_sources, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, pwd_hash, salt, req.avatar or "", "[]", now),
+        )
+        user_id = cursor.lastrowid
+        token = secrets.token_urlsafe(32)
+        cursor.execute(
+            "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
+            (token, user_id, now),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=409, detail="Username already exists.")
+    conn.close()
+
+    return {
+        "token": token,
+        "user": {
+            "id": user_id,
+            "username": username,
+            "avatar": req.avatar or "",
+            "custom_sources": [],
+        },
+    }
+
+
+@app.post("/api/login")
+async def login_user(req: AuthRequest):
+    username = req.username.strip()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+    row = cursor.fetchone()
+
+    if not row or hash_password(req.password, row["salt"]) != row["password_hash"]:
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    token = secrets.token_urlsafe(32)
+    cursor.execute(
+        "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
+        (token, row["id"], time.time()),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "token": token,
+        "user": {
+            "id": row["id"],
+            "username": row["username"],
+            "avatar": row["avatar"] or "",
+            "custom_sources": json.loads(row["custom_sources"] or "[]"),
+        },
+    }
+
+
+@app.get("/api/me")
+async def get_current_user(authorization: Optional[str] = Header(None)):
+    user = get_user_by_token(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    return {"user": user}
+
+
+@app.post("/api/profile/avatar")
+async def update_avatar(req: AvatarUpdateRequest, authorization: Optional[str] = Header(None)):
+    user = get_user_by_token(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET avatar = ? WHERE id = ?", (req.avatar, user["id"]))
+    conn.commit()
+    conn.close()
+
+    user["avatar"] = req.avatar
+    return {"user": user}
+
+
+@app.post("/api/profile/sources")
+async def update_custom_sources(req: CustomSourcesUpdateRequest, authorization: Optional[str] = Header(None)):
+    user = get_user_by_token(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    sources_json = json.dumps(req.custom_sources)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET custom_sources = ? WHERE id = ?", (sources_json, user["id"]))
+    conn.commit()
+    conn.close()
+
+    manager.invalidate_user_cache(user["id"])
+    user["custom_sources"] = req.custom_sources
+    return {"user": user}
+
+
+@app.post("/api/logout")
+async def logout_user(authorization: Optional[str] = Header(None)):
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+    return {"status": "ok"}
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            raw_msg = await websocket.receive_text()
+            try:
+                msg = json.loads(raw_msg)
+                if msg.get("action") == "set_mode":
+                    manager.set_client_mode(
+                        websocket,
+                        mode=msg.get("mode", "live"),
+                        token=msg.get("token"),
+                    )
+            except Exception:
+                pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

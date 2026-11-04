@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SOC Threat Matrix // Global OSINT Map</title>
+  
+  <!-- Font Awesome 6 Free Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="css/style.css">
   
   <!-- D3 Geo & TopoJSON -->
@@ -11,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 </head>
 <body>
-  <!-- Floating Country Cursor Tooltip (Follows mouse on country hover) -->
+  <!-- Floating Country Cursor Tooltip -->
   <div id="cursor-tooltip" class="cursor-tooltip">
     <img id="cursor-tooltip-flag" class="cursor-tooltip-flag" src="" alt="Flag" />
     <span id="cursor-tooltip-name" class="cursor-tooltip-name"></span>
@@ -19,36 +22,91 @@
 
   <!-- Top Telemetry Header -->
   <header class="hud-header">
-    <div class="hud-brand">
-      <div id="conn-status" class="status-indicator"></div>
-      <div class="brand-text">
-        <span class="system-title">THREAT_SENSOR // OSINT_LIVE</span>
-        <span class="system-sub" id="conn-label">CONNECTING TO THREAT STREAM...</span>
+    <div class="hud-mode-switcher">
+      <button id="btn-mode-live" class="mode-btn active" type="button">
+        <span id="conn-status" class="mode-dot"></span>
+        <span>LIVE INTEL FEED</span>
+      </button>
+
+      <div id="custom-mode-wrapper" class="custom-mode-wrapper locked">
+        <button id="btn-mode-custom" class="mode-btn inactive locked" type="button" disabled>
+          <span class="mode-dot custom-dot"></span>
+          <span>CUSTOM INTEL FEED</span>
+        </button>
+        <div id="custom-feed-tooltip" class="custom-feed-tooltip">
+          <i class="fa-solid fa-lock"></i>
+          <span>REGISTER OR LOGIN TO USE CUSTOM FEEDS</span>
+        </div>
       </div>
-    </div>
-    
-    <div class="hud-controls">
-      <div class="status-badge">LIVE INTEL FEED</div>
     </div>
 
-    <div class="hud-telemetry">
-      <div class="telemetry-block">
-        <span class="label">TOTAL ATTACKS COUNTED</span>
-        <span class="value" id="hud-attacks-total">0</span>
+    <div class="hud-right-group">
+      <div class="hud-telemetry">
+        <div class="telemetry-block">
+          <span class="label">TOTAL ATTACKS COUNTED</span>
+          <span class="value" id="hud-attacks-total">0</span>
+        </div>
+        <div class="telemetry-block">
+          <span class="label">ACTIVE ORIGINS</span>
+          <span class="value" id="hud-active-origins">0 REGIONS</span>
+        </div>
+        <div class="telemetry-block">
+          <span class="label">UTC TIME</span>
+          <span class="value" id="hud-clock">00:00:00</span>
+        </div>
       </div>
-      <div class="telemetry-block">
-        <span class="label">ACTIVE ORIGINS</span>
-        <span class="value" id="hud-active-origins">0 REGIONS</span>
-      </div>
-      <div class="telemetry-block">
-        <span class="label">UTC TIME</span>
-        <span class="value" id="hud-clock">00:00:00</span>
+
+      <div class="user-profile-wrapper">
+        <button id="btn-user-profile" class="user-btn logged-out" type="button" aria-label="User Account">
+          <img id="user-avatar-img" class="user-avatar-img" src="" alt="Avatar" style="display: none;" />
+          <i id="user-default-icon" class="fa-solid fa-user-astronaut user-fa-icon"></i>
+          <span id="user-auth-dot" class="user-auth-dot"></span>
+        </button>
+
+        <div class="user-dropdown-bridge">
+          <div class="user-dropdown-menu">
+            <div class="user-dropdown-header">
+              <span id="dropdown-user-status" class="dropdown-status-label">UNAUTHENTICATED SESSION</span>
+            </div>
+            <button id="menu-btn-account" class="user-menu-btn" type="button">
+              <i id="menu-icon-account" class="fa-solid fa-user-plus"></i>
+              <span id="menu-text-account">REGISTER / LOGIN</span>
+            </button>
+            <button id="menu-btn-feeds" class="user-menu-btn disabled" type="button">
+              <i class="fa-solid fa-satellite-dish"></i>
+              <span>CUSTOM FEED SETTINGS</span>
+            </button>
+            <button id="menu-btn-logout" class="user-menu-btn disabled" type="button">
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span>LOGOUT</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
 
-  <!-- Bottom-Left Command Deck -->
-  <aside class="bottom-left-deck">
+  <!-- Left Sidebar Column -->
+  <aside class="sidebar-column left-column">
+    <div class="deck-feed-card">
+      <div class="feed-header">
+        <span class="feed-tag">REAL-TIME INTRUSION FEED</span>
+        <span class="feed-status" id="feed-mode-label">LIVE OSINT STREAM</span>
+      </div>
+
+      <!-- Severity Filter Bar -->
+      <div class="feed-filter-bar">
+        <button class="filter-chip active" data-severity="ALL" type="button">ALL</button>
+        <button class="filter-chip" data-severity="HIGH" type="button">HIGH</button>
+        <button class="filter-chip" data-severity="MEDIUM" type="button">MED</button>
+        <button class="filter-chip" data-severity="LOW" type="button">LOW</button>
+      </div>
+
+      <div id="attack-ticker" class="attack-ticker">
+        <div class="ticker-empty">LISTENING FOR OSINT INTRUSIONS...</div>
+      </div>
+    </div>
+
     <div id="country-intel" class="deck-intel-bar idle">
       <div class="intel-left">
         <div class="flag-wrapper">
@@ -56,47 +114,161 @@
           <div id="flag-placeholder" class="flag-placeholder">🌐</div>
         </div>
         <div class="intel-meta">
-          <span id="country-name" class="intel-country">STANDBY // SENSORS ONLINE</span>
-          <span id="country-code" class="intel-code">ABUSE.CH FEED // REAL-TIME INTRUSIONS</span>
+          <span id="country-name" class="intel-country">STANDBY // SENSORS</span>
+          <span id="country-code" class="intel-code">ISO // NONE</span>
         </div>
       </div>
-      <div id="coords-hud" class="coords-display">LAT: 00.00° | LON: 00.00°</div>
-    </div>
-
-    <div class="deck-feed-card">
-      <div class="feed-header">
-        <span class="feed-tag">REAL-TIME INTRUSION FEED</span>
-        <span class="feed-status">ACCURATE CITY TELEMETRY</span>
-      </div>
-      <div id="attack-ticker" class="attack-ticker">
-        <div class="ticker-empty">LISTENING FOR OSINT INTRUSIONS...</div>
-      </div>
+      <div id="coords-hud" class="coords-display">00.00° | 00.00°</div>
     </div>
   </aside>
 
-  <!-- Right Sidebar Column: Top 10 Attacking & Top 10 Under Attack -->
+  <!-- Right Sidebar Column -->
   <div class="sidebar-column right-column">
-    <!-- Panel 1: Attacking Nations -->
     <aside class="panel-card">
       <div class="panel-header">
         <span class="panel-tag">TOP 10 ATTACKING NATIONS</span>
         <span class="panel-status" id="leaderboard-total-hits">0 HITS</span>
       </div>
-      <div id="leaderboard-list" class="leaderboard-list">
-        <!-- Rendered dynamically -->
-      </div>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
     </aside>
 
-    <!-- Panel 2: Nations Under Attack -->
     <aside class="panel-card">
       <div class="panel-header">
         <span class="panel-tag">TOP 10 NATIONS UNDER ATTACK</span>
         <span class="panel-status" id="target-total-hits">0 HITS</span>
       </div>
-      <div id="target-leaderboard-list" class="leaderboard-list">
-        <!-- Rendered dynamically -->
+      <div id="target-leaderboard-list" class="leaderboard-list"></div>
+    </aside>
+
+    <!-- Card 3: Gold Country Intelligence Dossier (Shown when a country is clicked) -->
+    <aside id="country-dossier-card" class="panel-card gold-card" style="display: none;">
+      <div class="panel-header gold-header">
+        <span class="panel-tag" id="dossier-header-tag">SECTOR INTELLIGENCE // DOSSIER</span>
+        <button id="btn-close-dossier" class="dossier-close-btn" type="button" title="Close Dossier">✕</button>
+      </div>
+
+      <div class="dossier-identity">
+        <div class="dossier-id-left">
+          <img id="dossier-flag" class="dossier-flag" src="" alt="Flag" />
+          <div class="dossier-title-group">
+            <span id="dossier-country-name" class="dossier-country-name">COUNTRY</span>
+            <span id="dossier-iso-sub" class="dossier-iso-sub">ISO: -- // SHARE: 0.0%</span>
+          </div>
+        </div>
+        <span id="dossier-threat-badge" class="dossier-threat-badge">ELEVATED</span>
+      </div>
+
+      <div class="dossier-stats-grid">
+        <div class="dossier-stat-box">
+          <span class="stat-label">OUTBOUND HITS</span>
+          <span id="dossier-outbound-val" class="stat-value">0</span>
+          <span id="dossier-outbound-rank" class="stat-sub">RANK: UNRANKED</span>
+        </div>
+        <div class="dossier-stat-box">
+          <span class="stat-label">INBOUND HITS</span>
+          <span id="dossier-inbound-val" class="stat-value">0</span>
+          <span id="dossier-inbound-rank" class="stat-sub">RANK: UNRANKED</span>
+        </div>
+        <div class="dossier-stat-box">
+          <span class="stat-label">DOMINANT THREAT</span>
+          <span id="dossier-top-malware" class="stat-value">NONE</span>
+          <span id="dossier-top-mitre" class="stat-sub">MITRE: N/A</span>
+        </div>
+        <div class="dossier-stat-box">
+          <span class="stat-label">PRIMARY VECTOR</span>
+          <span id="dossier-top-port" class="stat-value">--/TCP</span>
+          <span id="dossier-top-asn" class="stat-sub">ASN: N/A</span>
+        </div>
+      </div>
+
+      <div class="dossier-ratio-section">
+        <div class="dossier-ratio-labels">
+          <span id="dossier-ratio-out-lbl">OUTBOUND: 50%</span>
+          <span id="dossier-ratio-in-lbl">INBOUND: 50%</span>
+        </div>
+        <div class="leaderboard-bar-track gold-bar-track">
+          <div id="dossier-ratio-fill" class="leaderboard-bar-fill gold-bar-fill" style="width: 50%;"></div>
+        </div>
       </div>
     </aside>
+  </div>
+
+  <!-- User Authentication & Settings Modal -->
+  <div id="user-modal-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span id="modal-title" class="modal-title">SOC OPERATOR AUTHENTICATION</span>
+        <button id="btn-close-modal" class="modal-close-btn" type="button">✕</button>
+      </div>
+
+      <div id="modal-auth-view" class="modal-body">
+        <div class="auth-tabs">
+          <button id="tab-login" class="auth-tab active" type="button">LOGIN</button>
+          <button id="tab-register" class="auth-tab" type="button">REGISTER</button>
+        </div>
+
+        <form id="auth-form" class="auth-form">
+          <div class="form-group">
+            <label for="auth-username">OPERATOR CALLSIGN / USERNAME</label>
+            <input id="auth-username" type="text" placeholder="e.g. SOC_ANALYST_01" required autocomplete="username" />
+          </div>
+
+          <div class="form-group">
+            <label for="auth-password">SECURITY PASSKEY</label>
+            <input id="auth-password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+
+          <div id="register-avatar-group" class="form-group" style="display: none;">
+            <label>PROFILE ICON (OPTIONAL — STORED IN SQLITE)</label>
+            <div class="avatar-upload-row">
+              <div class="avatar-preview-box">
+                <img id="reg-avatar-preview" src="" alt="Preview" style="display: none;" />
+                <span id="reg-avatar-placeholder">?</span>
+              </div>
+              <label class="file-upload-btn">
+                <i class="fa-solid fa-upload"></i> UPLOAD IMAGE
+                <input id="reg-avatar-input" type="file" accept="image/*" hidden />
+              </label>
+            </div>
+          </div>
+
+          <div id="auth-error" class="auth-error" style="display: none;"></div>
+
+          <button id="btn-auth-submit" class="modal-primary-btn" type="submit">AUTHENTICATE</button>
+        </form>
+      </div>
+
+      <div id="modal-account-view" class="modal-body" style="display: none;">
+        <div class="profile-summary">
+          <div class="avatar-preview-box large">
+            <img id="profile-avatar-preview" src="" alt="Operator Avatar" style="display: none;" />
+            <span id="profile-avatar-placeholder"><i class="fa-solid fa-user-astronaut"></i></span>
+          </div>
+          <div class="profile-meta">
+            <span class="profile-callsign" id="profile-username-display">OPERATOR</span>
+            <span class="profile-status-tag">AUTHENTICATED // SQLITE PROFILE ACTIVE</span>
+            <label class="file-upload-btn small">
+              <i class="fa-solid fa-camera"></i> CHANGE PROFILE ICON
+              <input id="profile-avatar-input" type="file" accept="image/*" hidden />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div id="modal-feeds-view" class="modal-body" style="display: none;">
+        <div class="sources-section">
+          <div class="sources-header">
+            <span>CONFIGURE CUSTOM THREAT FEEDS (URL OR IP:PORT)</span>
+          </div>
+          <div class="source-add-row">
+            <input id="source-name-input" type="text" placeholder="Label (e.g. Feodo / Firewall)" />
+            <input id="source-url-input" type="text" placeholder="Feed URL or IP:Port" />
+            <button id="btn-add-source" class="source-add-btn" type="button">+ ADD</button>
+          </div>
+          <div id="custom-sources-list" class="custom-sources-list"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <canvas id="threat-map"></canvas>
