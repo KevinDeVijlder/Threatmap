@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# ⚡ Threat map // 2D OSINT ATTACK MAP
+# ⚡ Threatmap
 
 **A real-time, hardware-accelerated 2D global cyber threat visualizer powered by live Open-Source Intelligence (OSINT).**
 

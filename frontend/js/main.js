@@ -1,8 +1,9 @@
 /**
- * SOC Threat Matrix - Interactive Trajectory Lock & Gold Country Dossier Engine
- * - Clickable Feed Cards: Locks/highlights selected attack trajectory on map
- * - Clicked Country Selection: Renders country with bright gold border & lighter gold fill
- * - Gold Sector Intelligence Dossier Card: Live per-country telemetry & rankings
+ * SOC Threat Matrix - Complete Analyst Triage, OSINT Pivot & Export Engine
+ * - External Threat Intel Pivot Links (VirusTotal, AbuseIPDB, Shodan, NIST NVD, MITRE ATT&CK)
+ * - Stream Pause/Resume Freeze & Real-Time Search Filtering (Feed + Map)
+ * - One-Click IOC Clipboard Copy & Session JSON/CSV Export
+ * - Full ISO 3166-1 Country Lookup + Gold Country Dossier & Attack Dossier Cards
  */
 
 const CONFIG = {
@@ -15,13 +16,11 @@ const CONFIG = {
   coastlineWidth: 1.5,
   coastlineGlow: "rgba(0, 111, 255, 0.4)",
 
-  // Hover Country Styling (Blue)
   hoverFill: "#006FFF",
   hoverStroke: "#00F0FF",
   hoverStrokeWidth: 1.8,
   hoverGlowBlur: 18,
 
-  // Clicked / Selected Country Styling (Gold)
   selectedCountryFill: "rgba(255, 196, 0, 0.36)",
   selectedCountryStroke: "#FFD000",
   selectedCountryStrokeWidth: 2.2,
@@ -238,7 +237,6 @@ const COUNTRY_LOOKUP = {
   894: { name: "Zambia", code: "zm" }
 };
 
-// Fallback for territories in world-atlas that lack a numeric ISO id
 const NAME_FALLBACK_LOOKUP = {
   "Kosovo": { name: "Kosovo", code: "xk" },
   "Somaliland": { name: "Somaliland", code: "so" },
@@ -247,8 +245,6 @@ const NAME_FALLBACK_LOOKUP = {
   "Falkland Is.": { name: "Falkland Islands", code: "fk" },
   "Fr. S. Antarctic Lands": { name: "French Southern Lands", code: "tf" }
 };
-
-
 
 class ThreatMap {
   constructor() {
@@ -261,9 +257,21 @@ class ThreatMap {
     this.feedModeLabel = document.getElementById("feed-mode-label");
     this.activeFeedMode = "live";
 
+    // Filter, Search & Stream Freeze States
     this.currentSeverityFilter = "ALL";
+    this.searchQuery = "";
+    this.isStreamPaused = false;
     this.rawAttackBuffer = [];
-    this.selectedAttack = null; // Stores the clicked attack from the left feed
+    this.selectedAttack = null;
+
+    // Stream Control & Search DOM References
+    this.btnPauseStream = document.getElementById("btn-pause-stream");
+    this.pauseIcon = document.getElementById("pause-icon");
+    this.pauseLabel = document.getElementById("pause-label");
+    this.btnExportJson = document.getElementById("btn-export-json");
+    this.btnExportCsv = document.getElementById("btn-export-csv");
+    this.feedSearchInput = document.getElementById("feed-search-input");
+    this.btnClearSearch = document.getElementById("btn-clear-search");
 
     this.coordsHud = document.getElementById("coords-hud");
     this.hudAttacksTotal = document.getElementById("hud-attacks-total");
@@ -350,7 +358,7 @@ class ThreatMap {
     this.dossierRatioInLbl = document.getElementById("dossier-ratio-in-lbl");
     this.dossierRatioFill = document.getElementById("dossier-ratio-fill");
 
-    // Detailed Attack Telemetry Dossier DOM References
+    // Detailed Attack Telemetry Dossier & Pivot DOM References
     this.attackDossierCard = document.getElementById("attack-dossier-card");
     this.atkDossierHeaderTag = document.getElementById("atk-dossier-header-tag");
     this.btnCloseAttackDossier = document.getElementById("btn-close-attack-dossier");
@@ -370,6 +378,11 @@ class ThreatMap {
     this.atkDossierMitre = document.getElementById("atk-dossier-mitre");
     this.atkDossierAsn = document.getElementById("atk-dossier-asn");
     this.atkDossierTime = document.getElementById("atk-dossier-time");
+    this.atkPivotVt = document.getElementById("atk-pivot-vt");
+    this.atkPivotAbuse = document.getElementById("atk-pivot-abuse");
+    this.atkPivotShodan = document.getElementById("atk-pivot-shodan");
+    this.btnCopyIoc = document.getElementById("btn-copy-ioc");
+    this.copyIocLabel = document.getElementById("copy-ioc-label");
 
     this.countryFeatures = [];
     this.featureCollection = null;
@@ -384,12 +397,11 @@ class ThreatMap {
     this.maskW = 0;
     this.maskH = 0;
     this.hoveredCountryIndex = null;
-    this.selectedCountryIndex = null; // Clicked country index for Gold Highlight & Dossier
+    this.selectedCountryIndex = null;
 
     this.attacks = [];
     this.ripples = [];
 
-    // Persistent Telemetry
     this.totalAttacksCount = parseInt(localStorage.getItem("soc_total_attacks") || "0", 10);
     const savedOriginStats = localStorage.getItem("soc_country_stats");
     this.countryStats = savedOriginStats ? new Map(JSON.parse(savedOriginStats)) : new Map();
@@ -397,7 +409,6 @@ class ThreatMap {
     const savedTargetStats = localStorage.getItem("soc_target_stats");
     this.targetStats = savedTargetStats ? new Map(JSON.parse(savedTargetStats)) : new Map();
 
-    // Detailed per-country telemetry cache (code -> { malware, mitre, port, asn })
     this.countryDetails = new Map();
 
     this.ws = null;
@@ -425,7 +436,7 @@ class ThreatMap {
   }
 
   // =====================================================================
-  // SEVERITY NORMALIZATION, FILTER MATCHING & COLOR PALETTE
+  // SEVERITY NORMALIZATION, SEARCH & FILTER MATCHING
   // =====================================================================
 
   resolveSeverityBucket(data) {
@@ -459,9 +470,71 @@ class ThreatMap {
     return bucket === this.currentSeverityFilter;
   }
 
+  matchesSearchQuery(data) {
+    if (!this.searchQuery) return true;
+    const q = this.searchQuery.toLowerCase();
+    const haystack = [
+      data.malware,
+      data.category,
+      data.srcIp,
+      data.srcCity,
+      data.srcCountry,
+      data.srcCode,
+      data.srcAsn,
+      data.dstCity,
+      data.dstCountry,
+      data.dstCode,
+      data.cve,
+      data.mitre,
+      String(data.port || ""),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(q);
+  }
+
+  matchesActiveFilters(data) {
+    if (!data) return false;
+    const bucket = data._bucket || this.resolveSeverityBucket(data);
+    return this.matchesFilterBucket(bucket) && this.matchesSearchQuery(data);
+  }
+
   // =====================================================================
-  // GOLD COUNTRY INTELLIGENCE DOSSIER LOGIC
+  // COUNTRY METADATA & DOSSIER CARDS
   // =====================================================================
+
+  getCountryMeta(feature) {
+    if (!feature) return null;
+    const numericId = parseInt(feature.id, 10);
+    if (!Number.isNaN(numericId) && COUNTRY_LOOKUP[numericId]) {
+      return {
+        name: COUNTRY_LOOKUP[numericId].name,
+        code: COUNTRY_LOOKUP[numericId].code,
+        idLabel: numericId
+      };
+    }
+
+    const propName = feature.properties && feature.properties.name ? feature.properties.name.trim() : "";
+    if (propName && NAME_FALLBACK_LOOKUP[propName]) {
+      return {
+        name: NAME_FALLBACK_LOOKUP[propName].name,
+        code: NAME_FALLBACK_LOOKUP[propName].code,
+        idLabel: Number.isNaN(numericId) ? "EXT" : numericId
+      };
+    }
+
+    if (propName) {
+      return {
+        name: propName,
+        code: null,
+        idLabel: Number.isNaN(numericId) ? "EXT" : numericId
+      };
+    }
+
+    return null;
+  }
 
   recordCountryDetail(code, data) {
     if (!code) return;
@@ -563,9 +636,6 @@ class ThreatMap {
     this.countryDossierCard.style.display = "flex";
   }
 
-  /**
-   * Calculates great-circle distance (Haversine formula) in kilometers between origin & target.
-   */
   calculateDistanceKm(lat1, lon1, lat2, lon2) {
     const toRad = deg => (deg * Math.PI) / 180;
     const R = 6371;
@@ -579,9 +649,6 @@ class ThreatMap {
     return Math.round(R * c);
   }
 
-  /**
-   * Populates and opens (or closes) the Detailed Attack Telemetry Dossier card.
-   */
   updateAttackDossier() {
     if (!this.attackDossierCard) return;
 
@@ -603,14 +670,16 @@ class ThreatMap {
     const srcCity = (d.srcCity && d.srcCity !== "Unknown") ? d.srcCity : d.srcCountry;
     const dstCity = d.dstCity || d.dstCountry;
     const distKm = this.calculateDistanceKm(d.srcLat, d.srcLon, d.dstLat, d.dstLon);
-    const cveClean = (d.cve || "CVE-N/A").replace(/^CVE:\s*/i, "");
+    const cveClean = (d.cve || "CVE-N/A").replace(/^CVE:\s*/i, "").trim();
+    const mitreClean = (d.mitre || "T1071").trim();
+    const ipClean = (d.srcIp && d.srcIp !== "N/A") ? d.srcIp.trim() : "";
 
     this.atkDossierHeaderTag.textContent = `INTRUSION TELEMETRY // ID #${d._id.toUpperCase()}`;
     this.atkDossierMalware.textContent = d.malware || "UNKNOWN_THREAT";
     this.atkDossierCategory.textContent = `${d.category || "C2_EVENT"} // ${(d.feedMode || "LIVE").toUpperCase()} FEED`;
     this.atkDossierSevBadge.textContent = `${bucket} (${(d.severity || bucket).toUpperCase()})`;
 
-    this.atkDossierSrcIp.textContent = d.srcIp ? `IP: ${d.srcIp}` : `ASN: ${d.srcAsn || "AS_EDGE"}`;
+    this.atkDossierSrcIp.textContent = ipClean ? `IP: ${ipClean}` : `ASN: ${d.srcAsn || "AS_EDGE"}`;
     this.atkDossierSrcFlag.src = `https://flagcdn.com/w40/${srcCode}.png`;
     this.atkDossierSrcLoc.textContent = `${srcCity}, ${d.srcCountry} (${srcCode.toUpperCase()})`;
     this.atkDossierSrcCoords.textContent = `LAT: ${Number(d.srcLat).toFixed(4)}° | LON: ${Number(d.srcLon).toFixed(4)}°`;
@@ -622,61 +691,160 @@ class ThreatMap {
     this.atkDossierDstLoc.textContent = `${dstCity}, ${d.dstCountry} (${dstCode.toUpperCase()})`;
     this.atkDossierDstCoords.textContent = `LAT: ${Number(d.dstLat).toFixed(4)}° | LON: ${Number(d.dstLon).toFixed(4)}°`;
 
-    this.atkDossierCve.textContent = cveClean;
-    this.atkDossierMitre.textContent = d.mitre || "T1071";
+    // Clickable NIST NVD Link for CVE
+    const cveSpan = this.atkDossierCve.querySelector("span");
+    if (cveSpan) cveSpan.textContent = cveClean;
+    this.atkDossierCve.href = /^CVE-\d{4}-\d+/i.test(cveClean)
+      ? `https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cveClean)}`
+      : `https://nvd.nist.gov/vuln/search/results?query=${encodeURIComponent(d.malware || "")}`;
+
+    // Clickable MITRE ATT&CK Link (converts T1071.001 -> T1071/001)
+    const mitreSpan = this.atkDossierMitre.querySelector("span");
+    if (mitreSpan) mitreSpan.textContent = mitreClean;
+    const mitrePath = mitreClean.replace(".", "/");
+    this.atkDossierMitre.href = `https://attack.mitre.org/techniques/${mitrePath}/`;
+
     this.atkDossierAsn.textContent = d.srcAsn || "AS_EDGE";
     this.atkDossierTime.textContent = d._timestamp || "LIVE";
+
+    // External Threat Intel Pivot Links (VirusTotal, AbuseIPDB, Shodan)
+    const queryTarget = ipClean || d.srcCountry || "";
+    this.atkPivotVt.href = ipClean
+      ? `https://www.virustotal.com/gui/ip-address/${encodeURIComponent(ipClean)}`
+      : `https://www.virustotal.com/gui/search/${encodeURIComponent(queryTarget)}`;
+    this.atkPivotAbuse.href = ipClean
+      ? `https://www.abuseipdb.com/check/${encodeURIComponent(ipClean)}`
+      : `https://www.abuseipdb.com/`;
+    this.atkPivotShodan.href = ipClean
+      ? `https://www.shodan.io/host/${encodeURIComponent(ipClean)}`
+      : `https://www.shodan.io/search?query=${encodeURIComponent(queryTarget)}`;
 
     this.attackDossierCard.style.display = "flex";
   }
 
-  updateHoverIntel(countryIndex, clientX, clientY) {
-    if (!countryIndex || countryIndex <= 0 || countryIndex > this.countryFeatures.length) {
-      this.cursorTooltip.style.display = "none";
-      this.countryIntelBar.classList.remove("active");
-      this.countryIntelBar.classList.add("idle");
-      this.countryNameEl.textContent = "STANDBY // SENSORS";
-      this.countryCodeEl.textContent = "ISO // NONE";
-      this.countryFlagEl.style.display = "none";
-      this.flagPlaceholderEl.style.display = "block";
-      return;
+  // =====================================================================
+  // IOC COPY & SESSION EXPORT (JSON / CSV)
+  // =====================================================================
+
+  async copySelectedIoc() {
+    if (!this.selectedAttack) return;
+    const d = this.selectedAttack;
+    const srcCity = (d.srcCity && d.srcCity !== "Unknown") ? d.srcCity : d.srcCountry;
+    const dstCity = d.dstCity || d.dstCountry;
+    const cveClean = (d.cve || "CVE-N/A").replace(/^CVE:\s*/i, "");
+
+    const iocString = [
+      `[SOC_THREAT_MATRIX_IOC]`,
+      `Timestamp: ${d._timestamp || "LIVE"}`,
+      `Threat: ${d.malware || "UNKNOWN"} (${d.category || "EVENT"})`,
+      `Severity: ${d._bucket || d.severity}`,
+      `Source_IP: ${d.srcIp || "N/A"}`,
+      `ASN: ${d.srcAsn || "N/A"}`,
+      `Origin: ${srcCity}, ${d.srcCountry} (${(d.srcCode || "").toUpperCase()})`,
+      `Target: ${dstCity}, ${d.dstCountry} (${(d.dstCode || "").toUpperCase()})`,
+      `Vector: ${d.port || 443}/${d.proto || "TCP"}`,
+      `CVE: ${cveClean}`,
+      `MITRE: ${d.mitre || "N/A"}`,
+    ].join(" | ");
+
+    try {
+      await navigator.clipboard.writeText(iocString);
+      this.btnCopyIoc.classList.add("copied");
+      this.copyIocLabel.textContent = "COPIED!";
+      setTimeout(() => {
+        this.btnCopyIoc.classList.remove("copied");
+        this.copyIocLabel.textContent = "COPY IOC";
+      }, 1600);
+    } catch (err) {
+      console.error("Clipboard copy failed:", err);
+    }
+  }
+
+  getFilteredBufferForExport() {
+    return this.rawAttackBuffer.filter(d => this.matchesActiveFilters(d));
+  }
+
+  exportSessionData(format = "json") {
+    const records = this.getFilteredBufferForExport();
+    if (records.length === 0) return;
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    let blob;
+    let filename;
+
+    if (format === "csv") {
+      const headers = [
+        "timestamp", "id", "severity", "malware", "category",
+        "src_ip", "src_country", "src_code", "src_city", "src_asn", "src_lat", "src_lon",
+        "dst_country", "dst_code", "dst_city", "dst_lat", "dst_lon",
+        "port", "proto", "cve", "mitre", "feed_mode"
+      ];
+      const escapeCsv = val => `"${String(val ?? "").replace(/"/g, '""')}"`;
+      const rows = records.map(d => [
+        d._timestamp || "",
+        d._id || "",
+        d._bucket || d.severity || "",
+        d.malware || "",
+        d.category || "",
+        d.srcIp || "",
+        d.srcCountry || "",
+        d.srcCode || "",
+        d.srcCity || "",
+        d.srcAsn || "",
+        d.srcLat ?? "",
+        d.srcLon ?? "",
+        d.dstCountry || "",
+        d.dstCode || "",
+        d.dstCity || "",
+        d.dstLat ?? "",
+        d.dstLon ?? "",
+        d.port ?? "",
+        d.proto || "TCP",
+        (d.cve || "").replace(/^CVE:\s*/i, ""),
+        d.mitre || "",
+        d.feedMode || "live"
+      ].map(escapeCsv).join(","));
+
+      const csvContent = [headers.join(","), ...rows].join("\n");
+      blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      filename = `soc_threat_capture_${stamp}.csv`;
+    } else {
+      const cleanJson = records.map(d => ({
+        timestamp: d._timestamp,
+        id: d._id,
+        severity: d._bucket || d.severity,
+        malware: d.malware,
+        category: d.category,
+        src_ip: d.srcIp,
+        src_country: d.srcCountry,
+        src_code: d.srcCode,
+        src_city: d.srcCity,
+        src_asn: d.srcAsn,
+        src_lat: d.srcLat,
+        src_lon: d.srcLon,
+        dst_country: d.dstCountry,
+        dst_code: d.dstCode,
+        dst_city: d.dstCity,
+        dst_lat: d.dstLat,
+        dst_lon: d.dstLon,
+        port: d.port,
+        proto: d.proto,
+        cve: (d.cve || "").replace(/^CVE:\s*/i, ""),
+        mitre: d.mitre,
+        feed_mode: d.feedMode || "live",
+      }));
+      blob = new Blob([JSON.stringify(cleanJson, null, 2)], { type: "application/json" });
+      filename = `soc_threat_capture_${stamp}.json`;
     }
 
-    const feature = this.countryFeatures[countryIndex - 1];
-    const meta = this.getCountryMeta(feature);
-
-    this.countryIntelBar.classList.add("active");
-    this.countryIntelBar.classList.remove("idle");
-
-    if (meta && meta.code) {
-      const flagUrl = `https://flagcdn.com/w80/${meta.code.toLowerCase()}.png`;
-
-      this.cursorTooltipFlag.style.display = "block";
-      this.cursorTooltipFlag.src = flagUrl;
-      this.cursorTooltipName.textContent = meta.name.toUpperCase();
-      this.cursorTooltip.style.left = `${clientX}px`;
-      this.cursorTooltip.style.top = `${clientY}px`;
-      this.cursorTooltip.style.display = "flex";
-
-      this.countryNameEl.textContent = meta.name.toUpperCase();
-      this.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} // ID: ${meta.idLabel}`;
-      this.countryFlagEl.src = flagUrl;
-      this.countryFlagEl.onload = () => {
-        this.countryFlagEl.style.display = "block";
-        this.flagPlaceholderEl.style.display = "none";
-      };
-    } else if (meta) {
-      this.cursorTooltipFlag.style.display = "none";
-      this.cursorTooltipName.textContent = meta.name.toUpperCase();
-      this.cursorTooltip.style.left = `${clientX}px`;
-      this.cursorTooltip.style.top = `${clientY}px`;
-      this.cursorTooltip.style.display = "flex";
-
-      this.countryNameEl.textContent = meta.name.toUpperCase();
-      this.countryCodeEl.textContent = `ID: ${meta.idLabel}`;
-      this.countryFlagEl.style.display = "none";
-      this.flagPlaceholderEl.style.display = "block";
-    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // =====================================================================
@@ -698,7 +866,7 @@ class ThreatMap {
       this.btnModeLive.classList.remove("inactive");
       this.btnModeCustom.classList.remove("active");
       this.btnModeCustom.classList.add("inactive");
-      this.feedModeLabel.textContent = "LIVE OSINT STREAM";
+      this.feedModeLabel.textContent = this.isStreamPaused ? "STREAM PAUSED" : "LIVE OSINT STREAM";
       this.attackTicker.innerHTML = `<div class="ticker-empty">LISTENING FOR LIVE OSINT INTRUSIONS...</div>`;
     } else {
       this.btnModeCustom.classList.add("active");
@@ -884,25 +1052,80 @@ class ThreatMap {
     }
   }
 
+  toggleStreamPause() {
+    this.isStreamPaused = !this.isStreamPaused;
+    this.btnPauseStream.classList.toggle("paused", this.isStreamPaused);
+    if (this.isStreamPaused) {
+      this.pauseIcon.className = "fa-solid fa-play";
+      this.pauseLabel.textContent = "RESUME";
+      this.feedModeLabel.textContent = "STREAM PAUSED";
+    } else {
+      this.pauseIcon.className = "fa-solid fa-pause";
+      this.pauseLabel.textContent = "PAUSE";
+      this.feedModeLabel.textContent = this.activeFeedMode === "live"
+        ? "LIVE OSINT STREAM"
+        : `CUSTOM // ${this.currentUser ? this.currentUser.username.toUpperCase() : "FEED"}`;
+    }
+  }
+
   bindFilterEvents() {
     const filterBar = document.querySelector(".feed-filter-bar");
-    if (!filterBar) return;
+    if (filterBar) {
+      filterBar.addEventListener("click", (e) => {
+        const chip = e.target.closest(".filter-chip");
+        if (!chip) return;
 
-    filterBar.addEventListener("click", (e) => {
-      const chip = e.target.closest(".filter-chip");
-      if (!chip) return;
+        filterBar.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        this.currentSeverityFilter = chip.dataset.severity;
 
-      filterBar.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-      this.currentSeverityFilter = chip.dataset.severity;
+        if (this.selectedAttack && !this.matchesActiveFilters(this.selectedAttack)) {
+          this.selectedAttack = null;
+          this.updateAttackDossier();
+        }
 
-      if (this.selectedAttack && !this.matchesFilterBucket(this.selectedAttack._bucket)) {
-        this.selectedAttack = null;
-        this.updateAttackDossier();
-      }
+        this.rebuildTickerFromBuffer();
+      });
+    }
 
-      this.rebuildTickerFromBuffer();
-    });
+    // Stream Pause / Resume Button
+    if (this.btnPauseStream) {
+      this.btnPauseStream.addEventListener("click", () => {
+        this.toggleStreamPause();
+      });
+    }
+
+    // Export Session JSON & CSV Buttons
+    if (this.btnExportJson) {
+      this.btnExportJson.addEventListener("click", () => this.exportSessionData("json"));
+    }
+    if (this.btnExportCsv) {
+      this.btnExportCsv.addEventListener("click", () => this.exportSessionData("csv"));
+    }
+
+    // Live Search Input & Clear Button
+    if (this.feedSearchInput) {
+      this.feedSearchInput.addEventListener("input", (e) => {
+        this.searchQuery = e.target.value.trim();
+        if (this.btnClearSearch) {
+          this.btnClearSearch.style.display = this.searchQuery ? "block" : "none";
+        }
+        if (this.selectedAttack && !this.matchesActiveFilters(this.selectedAttack)) {
+          this.selectedAttack = null;
+          this.updateAttackDossier();
+        }
+        this.rebuildTickerFromBuffer();
+      });
+    }
+
+    if (this.btnClearSearch) {
+      this.btnClearSearch.addEventListener("click", () => {
+        this.searchQuery = "";
+        this.feedSearchInput.value = "";
+        this.btnClearSearch.style.display = "none";
+        this.rebuildTickerFromBuffer();
+      });
+    }
 
     // Click on a feed card to lock/unlock its trajectory & open/close the Attack Dossier Card
     this.attackTicker.addEventListener("click", (e) => {
@@ -929,6 +1152,13 @@ class ThreatMap {
         this.updateAttackDossier();
       });
     }
+
+    // Copy IOC Button inside Attack Dossier Card
+    if (this.btnCopyIoc) {
+      this.btnCopyIoc.addEventListener("click", () => {
+        this.copySelectedIoc();
+      });
+    }
   }
 
   syncSelectedCardDOM() {
@@ -944,10 +1174,8 @@ class ThreatMap {
   }
 
   rebuildTickerFromBuffer() {
-    this.attackTicker.innerHTML = `<div class="ticker-empty">LISTENING FOR INTRUSIONS...</div>`;
-    const filtered = this.rawAttackBuffer.filter(data =>
-      this.matchesFilterBucket(data._bucket)
-    );
+    this.attackTicker.innerHTML = `<div class="ticker-empty">NO MATCHING INTRUSIONS IN BUFFER...</div>`;
+    const filtered = this.rawAttackBuffer.filter(data => this.matchesActiveFilters(data));
 
     for (const data of filtered.slice(0, 20).reverse()) {
       this.appendTickerRowDOM(data);
@@ -1189,6 +1417,7 @@ class ThreatMap {
 
       this.ws.onmessage = (event) => {
         try {
+          if (this.isStreamPaused) return;
           const payload = JSON.parse(event.data);
           if (payload.feedMode && payload.feedMode !== this.activeFeedMode) {
             return;
@@ -1223,13 +1452,12 @@ class ThreatMap {
     data._timestamp = new Date().toTimeString().split(" ")[0] + " UTC";
 
     this.rawAttackBuffer.unshift(data);
-    if (this.rawAttackBuffer.length > 100) this.rawAttackBuffer.pop();
+    if (this.rawAttackBuffer.length > 250) this.rawAttackBuffer.pop();
 
-    // Record detailed per-country signatures for the Gold Dossier Card
     this.recordCountryDetail(data.srcCode, data);
     this.recordCountryDetail(data.dstCode, data);
 
-    if (this.matchesFilterBucket(bucket)) {
+    if (this.matchesActiveFilters(data)) {
       this.appendTickerRowDOM(data);
     }
 
@@ -1263,7 +1491,7 @@ class ThreatMap {
       data: data,
     });
 
-    this.addRipple(srcScreen[0], srcScreen[1], arcColor, 16, 0.85, bucket);
+    this.addRipple(srcScreen[0], srcScreen[1], arcColor, 16, 0.85, data);
     this.totalAttacksCount++;
     localStorage.setItem("soc_total_attacks", this.totalAttacksCount.toString());
 
@@ -1377,8 +1605,8 @@ class ThreatMap {
     }
   }
 
-  addRipple(x, y, color, maxRadius = 24, maxOpacity = 0.8, bucket = "LOW") {
-    this.ripples.push({ x, y, radius: 2, maxRadius, opacity: maxOpacity, color, bucket });
+  addRipple(x, y, color, maxRadius = 24, maxOpacity = 0.8, data = null) {
+    this.ripples.push({ x, y, radius: 2, maxRadius, opacity: maxOpacity, color, data });
   }
 
   getBezierPoint(t, p0, p1, p2) {
@@ -1420,9 +1648,6 @@ class ThreatMap {
     ctx.fillText(labelText, labelX + 17, labelY + labelH / 2 + 0.5);
   }
 
-  /**
-   * Renders the locked/highlighted trajectory when a user clicks an attack card in the feed.
-   */
   renderSelectedAttack() {
     if (!this.selectedAttack || !this.projection) return;
     const data = this.selectedAttack;
@@ -1443,7 +1668,6 @@ class ThreatMap {
 
     ctx.save();
 
-    // 1. Outer Glowing Trajectory Path
     ctx.strokeStyle = color;
     ctx.shadowColor = color;
     ctx.shadowBlur = 16;
@@ -1454,7 +1678,6 @@ class ThreatMap {
     ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
     ctx.stroke();
 
-    // 2. Inner Crisp White Core Line
     ctx.strokeStyle = "#ffffff";
     ctx.globalAlpha = 0.65;
     ctx.lineWidth = 1.0;
@@ -1463,7 +1686,6 @@ class ThreatMap {
     ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
     ctx.stroke();
 
-    // 3. Repeating Photon Pulse Along Selected Trajectory
     const t = (performance.now() * 0.00045) % 1;
     const pulsePt = this.getBezierPoint(t, start, control, end);
     ctx.shadowColor = "#00F0FF";
@@ -1474,7 +1696,6 @@ class ThreatMap {
     ctx.arc(pulsePt.x, pulsePt.y, 4.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4. Origin & Target Reticle Beacons
     const pulseRadius = 8 + Math.sin(performance.now() * 0.006) * 3;
     ctx.strokeStyle = "#00F0FF";
     ctx.lineWidth = 1.6;
@@ -1487,7 +1708,6 @@ class ThreatMap {
     ctx.arc(end.x, end.y, pulseRadius + 2, 0, Math.PI * 2);
     ctx.stroke();
 
-    // 5. Origin & Destination Nameplates
     const originName = (data.srcCity && data.srcCity !== "Unknown") ? data.srcCity : data.srcCountry;
     const targetName = data.dstCity ? data.dstCity : data.dstCountry;
     this.drawCityBadge(start.x, start.y, `${originName} (${data.srcCode.toUpperCase()})`, "#00F0FF", "#006FFF");
@@ -1553,18 +1773,20 @@ class ThreatMap {
     const ctx = this.ctx;
     const dimFactor = this.selectedAttack ? 0.35 : 1.0;
 
-    // 1. Shockwaves
+    // 1. Shockwaves (Filtered by severity + live search; frozen in place when stream is paused)
     for (let i = this.ripples.length - 1; i >= 0; i--) {
       const rip = this.ripples[i];
-      rip.radius += 0.55;
-      rip.opacity -= 0.015;
+      if (!this.isStreamPaused) {
+        rip.radius += 0.55;
+        rip.opacity -= 0.015;
+      }
 
       if (rip.opacity <= 0 || rip.radius >= rip.maxRadius) {
         this.ripples.splice(i, 1);
         continue;
       }
 
-      if (!this.matchesFilterBucket(rip.bucket)) continue;
+      if (rip.data && !this.matchesActiveFilters(rip.data)) continue;
 
       ctx.save();
       ctx.strokeStyle = rip.color;
@@ -1576,18 +1798,20 @@ class ThreatMap {
       ctx.restore();
     }
 
-    // 2. Live Trajectories & City Nameplates
+    // 2. Live Trajectories & City Nameplates (Filtered by severity + live search)
     for (let i = this.attacks.length - 1; i >= 0; i--) {
       const atk = this.attacks[i];
-      atk.progress += atk.speed;
+      if (!this.isStreamPaused) {
+        atk.progress += atk.speed;
+      }
 
       if (atk.progress >= 1) {
-        this.addRipple(atk.end.x, atk.end.y, atk.color, 32, 1.0, atk.bucket);
+        this.addRipple(atk.end.x, atk.end.y, atk.color, 32, 1.0, atk.data);
         this.attacks.splice(i, 1);
         continue;
       }
 
-      if (!this.matchesFilterBucket(atk.bucket)) continue;
+      if (!this.matchesActiveFilters(atk.data)) continue;
 
       ctx.save();
 
@@ -1683,7 +1907,6 @@ class ThreatMap {
       ctx.restore();
     }
 
-    // Hovered Country (Blue, only if different from the clicked Gold country)
     if (this.hoveredCountryIndex !== null && this.hoveredCountryIndex !== this.selectedCountryIndex) {
       const feature = this.countryFeatures[this.hoveredCountryIndex - 1];
       if (feature) {
@@ -1704,7 +1927,6 @@ class ThreatMap {
       }
     }
 
-    // Clicked / Selected Country (Gold border + lighter gold interior)
     if (this.selectedCountryIndex !== null) {
       const selFeature = this.countryFeatures[this.selectedCountryIndex - 1];
       if (selFeature) {
@@ -1733,6 +1955,54 @@ class ThreatMap {
     requestAnimationFrame(() => this.animate());
   }
 
+  updateHoverIntel(countryIndex, clientX, clientY) {
+    if (!countryIndex || countryIndex <= 0 || countryIndex > this.countryFeatures.length) {
+      this.cursorTooltip.style.display = "none";
+      this.countryIntelBar.classList.remove("active");
+      this.countryIntelBar.classList.add("idle");
+      this.countryNameEl.textContent = "STANDBY";
+      this.countryCodeEl.textContent = "ISO";
+      this.countryFlagEl.style.display = "none";
+      this.flagPlaceholderEl.style.display = "block";
+      return;
+    }
+
+    const feature = this.countryFeatures[countryIndex - 1];
+    const meta = this.getCountryMeta(feature);
+
+    this.countryIntelBar.classList.add("active");
+    this.countryIntelBar.classList.remove("idle");
+
+    if (meta && meta.code) {
+      const flagUrl = `https://flagcdn.com/w80/${meta.code.toLowerCase()}.png`;
+
+      this.cursorTooltipFlag.style.display = "block";
+      this.cursorTooltipFlag.src = flagUrl;
+      this.cursorTooltipName.textContent = meta.name.toUpperCase();
+      this.cursorTooltip.style.left = `${clientX}px`;
+      this.cursorTooltip.style.top = `${clientY}px`;
+      this.cursorTooltip.style.display = "flex";
+
+      this.countryNameEl.textContent = meta.name.toUpperCase();
+      this.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} // ID: ${meta.idLabel}`;
+      this.countryFlagEl.src = flagUrl;
+      this.countryFlagEl.onload = () => {
+        this.countryFlagEl.style.display = "block";
+        this.flagPlaceholderEl.style.display = "none";
+      };
+    } else if (meta) {
+      this.cursorTooltipFlag.style.display = "none";
+      this.cursorTooltipName.textContent = meta.name.toUpperCase();
+      this.cursorTooltip.style.left = `${clientX}px`;
+      this.cursorTooltip.style.top = `${clientY}px`;
+      this.cursorTooltip.style.display = "flex";
+
+      this.countryNameEl.textContent = meta.name.toUpperCase();
+      this.countryCodeEl.textContent = `ID: ${meta.idLabel}`;
+      this.countryFlagEl.style.display = "none";
+      this.flagPlaceholderEl.style.display = "block";
+    }
+  }
 
   detectCountryAtPoint(mouseX, mouseY) {
     const px = Math.floor(mouseX);
@@ -1776,7 +2046,6 @@ class ThreatMap {
       const clickedCountryIdx = this.detectCountryAtPoint(mouseX, mouseY);
 
       if (clickedCountryIdx !== null) {
-        // Clicking the already-selected country unselects it and closes the card
         if (this.selectedCountryIndex === clickedCountryIdx) {
           this.selectedCountryIndex = null;
         } else {
@@ -1822,44 +2091,7 @@ class ThreatMap {
     update();
     setInterval(update, 1000);
   }
-
-  /**
-   * Resolves any TopoJSON country feature into { name, code, idLabel }
-   * using ISO numeric ID first, then feature.properties.name as fallback.
-   */
-  getCountryMeta(feature) {
-    if (!feature) return null;
-    const numericId = parseInt(feature.id, 10);
-    if (!Number.isNaN(numericId) && COUNTRY_LOOKUP[numericId]) {
-      return {
-        name: COUNTRY_LOOKUP[numericId].name,
-        code: COUNTRY_LOOKUP[numericId].code,
-        idLabel: numericId
-      };
-    }
-
-    const propName = feature.properties && feature.properties.name ? feature.properties.name.trim() : "";
-    if (propName && NAME_FALLBACK_LOOKUP[propName]) {
-      return {
-        name: NAME_FALLBACK_LOOKUP[propName].name,
-        code: NAME_FALLBACK_LOOKUP[propName].code,
-        idLabel: Number.isNaN(numericId) ? "EXT" : numericId
-      };
-    }
-
-    if (propName) {
-      return {
-        name: propName,
-        code: null,
-        idLabel: Number.isNaN(numericId) ? "EXT" : numericId
-      };
-    }
-
-    return null;
-  }
 }
-
-
 
 document.addEventListener("DOMContentLoaded", () => {
   window.threatMap = new ThreatMap();

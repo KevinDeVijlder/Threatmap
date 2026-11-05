@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOC Threat Matrix // Global OSINT Map</title>
+  <title>Threat Map</title>
+  
+  <!-- Project Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   
   <!-- Font Awesome 6 Free Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -12,7 +15,6 @@
   <!-- D3 Geo & TopoJSON -->
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
-  <link rel="icon" href="/favicon.png" type="image/x-icon">
 </head>
 <body>
   <!-- Floating Country Cursor Tooltip -->
@@ -95,6 +97,29 @@
         <span class="feed-status" id="feed-mode-label">LIVE OSINT STREAM</span>
       </div>
 
+      <!-- Stream Controls: Pause/Resume & Export JSON/CSV -->
+      <div class="feed-Action-bar">
+        <button id="btn-pause-stream" class="stream-ctrl-btn" type="button" title="Pause / Resume Live Stream">
+          <i id="pause-icon" class="fa-solid fa-pause"></i>
+          <span id="pause-label">PAUSE</span>
+        </button>
+        <div class="export-btn-group">
+          <button id="btn-export-json" class="stream-ctrl-btn export-btn" type="button" title="Export Captured Packets as JSON">
+            <i class="fa-solid fa-file-code"></i> JSON
+          </button>
+          <button id="btn-export-csv" class="stream-ctrl-btn export-btn" type="button" title="Export Captured Packets as CSV">
+            <i class="fa-solid fa-file-csv"></i> CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Search Bar -->
+      <div class="feed-search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input id="feed-search-input" type="text" placeholder="Filter threat, IP, port, ASN, country..." autocomplete="off" />
+        <button id="btn-clear-search" class="search-clear-btn" type="button" style="display: none;" title="Clear Search">✕</button>
+      </div>
+
       <!-- Severity Filter Bar -->
       <div class="feed-filter-bar">
         <button class="filter-chip active" data-severity="ALL" type="button">ALL</button>
@@ -115,8 +140,8 @@
           <div id="flag-placeholder" class="flag-placeholder">🌐</div>
         </div>
         <div class="intel-meta">
-          <span id="country-name" class="intel-country">STANDBY // SENSORS</span>
-          <span id="country-code" class="intel-code">ISO // NONE</span>
+          <span id="country-name" class="intel-country">STANDBY</span>
+          <span id="country-code" class="intel-code">ISO</span>
         </div>
       </div>
       <div id="coords-hud" class="coords-display">00.00° | 00.00°</div>
@@ -144,7 +169,7 @@
     <!-- Card 3: Gold Country Intelligence Dossier (Shown when a country is clicked) -->
     <aside id="country-dossier-card" class="panel-card gold-card" style="display: none;">
       <div class="panel-header gold-header">
-        <span class="panel-tag" id="dossier-header-tag">SECTOR INTELLIGENCE // DOSSIER</span>
+        <span class="panel-tag" id="dossier-header-tag">SECTOR INTELLIGENCE</span>
         <button id="btn-close-dossier" class="dossier-close-btn" type="button" title="Close Dossier">✕</button>
       </div>
 
@@ -192,18 +217,18 @@
         </div>
       </div>
     </aside>
-    
+
     <!-- Card 4: Detailed Attack Telemetry Dossier (Shown when a feed attack is clicked) -->
     <aside id="attack-dossier-card" class="panel-card attack-dossier-card" style="display: none;">
       <div class="panel-header attack-dossier-header">
-        <span class="panel-tag" id="atk-dossier-header-tag">INTRUSION TELEMETRY // PACKET</span>
+        <span class="panel-tag" id="atk-dossier-header-tag">INTRUSION TELEMETRY</span>
         <button id="btn-close-attack-dossier" class="dossier-close-btn atk-close-btn" type="button" title="Deselect Attack">✕</button>
       </div>
 
       <div class="atk-identity-banner">
         <div class="atk-id-main">
           <span id="atk-dossier-malware" class="atk-malware-title">MALWARE</span>
-          <span id="atk-dossier-category" class="atk-category-sub">CATEGORY // LIVE FEED</span>
+          <span id="atk-dossier-category" class="atk-category-sub">CATEGORY</span>
         </div>
         <span id="atk-dossier-sev-badge" class="atk-sev-badge">HIGH</span>
       </div>
@@ -240,15 +265,21 @@
         </div>
       </div>
 
-      <!-- Complete Technical Metadata Grid -->
+      <!-- Complete Technical Metadata Grid (Clickable CVE & MITRE Links) -->
       <div class="dossier-stats-grid atk-stats-grid">
         <div class="dossier-stat-box atk-stat-box">
-          <span class="stat-label">VULNERABILITY</span>
-          <span id="atk-dossier-cve" class="stat-value">CVE-N/A</span>
+          <span class="stat-label">VULNERABILITY (NVD)</span>
+          <a id="atk-dossier-cve" class="stat-value stat-link" href="#" target="_blank" rel="noopener noreferrer">
+            <span>CVE-N/A</span>
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
         </div>
         <div class="dossier-stat-box atk-stat-box">
           <span class="stat-label">MITRE ATT&amp;CK</span>
-          <span id="atk-dossier-mitre" class="stat-value">T1071</span>
+          <a id="atk-dossier-mitre" class="stat-value stat-link" href="#" target="_blank" rel="noopener noreferrer">
+            <span>T1071</span>
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
         </div>
         <div class="dossier-stat-box atk-stat-box">
           <span class="stat-label">ORIGIN ASN</span>
@@ -257,6 +288,25 @@
         <div class="dossier-stat-box atk-stat-box">
           <span class="stat-label">CAPTURED AT</span>
           <span id="atk-dossier-time" class="stat-value">00:00:00 UTC</span>
+        </div>
+      </div>
+
+      <!-- External Threat Intel Pivot Links & One-Click IOC Copy -->
+      <div class="atk-pivot-section">
+        <span class="pivot-section-label">EXTERNAL OSINT PIVOT &amp; TRIAGE</span>
+        <div class="atk-pivot-grid">
+          <a id="atk-pivot-vt" class="pivot-btn" href="#" target="_blank" rel="noopener noreferrer" title="Inspect IP on VirusTotal">
+            <i class="fa-solid fa-shield-virus"></i> VIRUSTOTAL
+          </a>
+          <a id="atk-pivot-abuse" class="pivot-btn" href="#" target="_blank" rel="noopener noreferrer" title="Inspect IP on AbuseIPDB">
+            <i class="fa-solid fa-biohazard"></i> ABUSEIPDB
+          </a>
+          <a id="atk-pivot-shodan" class="pivot-btn" href="#" target="_blank" rel="noopener noreferrer" title="Inspect Host on Shodan">
+            <i class="fa-solid fa-satellite"></i> SHODAN
+          </a>
+          <button id="btn-copy-ioc" class="pivot-btn copy-ioc-btn" type="button" title="Copy Full IOC Summary">
+            <i class="fa-regular fa-copy"></i> <span id="copy-ioc-label">COPY IOC</span>
+          </button>
         </div>
       </div>
     </aside>
@@ -278,7 +328,7 @@
 
         <form id="auth-form" class="auth-form">
           <div class="form-group">
-            <label for="auth-username">OPERATOR CALLSIGN / USERNAME</label>
+            <label for="auth-username">USERNAME</label>
             <input id="auth-username" type="text" placeholder="e.g. SOC_ANALYST_01" required autocomplete="username" />
           </div>
 
@@ -288,7 +338,7 @@
           </div>
 
           <div id="register-avatar-group" class="form-group" style="display: none;">
-            <label>PROFILE ICON (OPTIONAL — STORED IN SQLITE)</label>
+            <label>PROFILE ICON</label>
             <div class="avatar-upload-row">
               <div class="avatar-preview-box">
                 <img id="reg-avatar-preview" src="" alt="Preview" style="display: none;" />
@@ -315,7 +365,7 @@
           </div>
           <div class="profile-meta">
             <span class="profile-callsign" id="profile-username-display">OPERATOR</span>
-            <span class="profile-status-tag">AUTHENTICATED // SQLITE PROFILE ACTIVE</span>
+            <span class="profile-status-tag">AUTHENTICATED</span>
             <label class="file-upload-btn small">
               <i class="fa-solid fa-camera"></i> CHANGE PROFILE ICON
               <input id="profile-avatar-input" type="file" accept="image/*" hidden />
