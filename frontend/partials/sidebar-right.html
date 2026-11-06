@@ -1,0 +1,163 @@
+<!-- Right Sidebar Column -->
+<div class="sidebar-column right-column">
+  <aside class="panel-card">
+    <div class="panel-header">
+      <span class="panel-tag">TOP 10 ATTACKING NATIONS</span>
+      <span class="panel-status" id="leaderboard-total-hits">0 HITS</span>
+    </div>
+    <div id="leaderboard-list" class="leaderboard-list"></div>
+  </aside>
+
+  <aside class="panel-card">
+    <div class="panel-header">
+      <span class="panel-tag">TOP 10 NATIONS UNDER ATTACK</span>
+      <span class="panel-status" id="target-total-hits">0 HITS</span>
+    </div>
+    <div id="target-leaderboard-list" class="leaderboard-list"></div>
+  </aside>
+
+  <!-- Card 3: Gold Country Intelligence Dossier (Shown when a country is clicked) -->
+  <aside id="country-dossier-card" class="panel-card gold-card" style="display: none;">
+    <div class="panel-header gold-header">
+      <span class="panel-tag" id="dossier-header-tag">SECTOR INTELLIGENCE</span>
+      <button id="btn-close-dossier" class="dossier-close-btn" type="button" title="Close Dossier">✕</button>
+    </div>
+
+    <div class="dossier-identity">
+      <div class="dossier-id-left">
+        <img id="dossier-flag" class="dossier-flag" src="" alt="Flag" />
+        <div class="dossier-title-group">
+          <span id="dossier-country-name" class="dossier-country-name">COUNTRY</span>
+          <span id="dossier-iso-sub" class="dossier-iso-sub">ISO: -- // SHARE: 0.0%</span>
+        </div>
+      </div>
+      <span id="dossier-threat-badge" class="dossier-threat-badge">ELEVATED</span>
+    </div>
+
+    <div class="dossier-stats-grid">
+      <div class="dossier-stat-box">
+        <span class="stat-label">OUTBOUND HITS</span>
+        <span id="dossier-outbound-val" class="stat-value">0</span>
+        <span id="dossier-outbound-rank" class="stat-sub">RANK: UNRANKED</span>
+      </div>
+      <div class="dossier-stat-box">
+        <span class="stat-label">INBOUND HITS</span>
+        <span id="dossier-inbound-val" class="stat-value">0</span>
+        <span id="dossier-inbound-rank" class="stat-sub">RANK: UNRANKED</span>
+      </div>
+      <div class="dossier-stat-box">
+        <span class="stat-label">DOMINANT THREAT</span>
+        <span id="dossier-top-malware" class="stat-value">NONE</span>
+        <span id="dossier-top-mitre" class="stat-sub">MITRE: N/A</span>
+      </div>
+      <div class="dossier-stat-box">
+        <span class="stat-label">PRIMARY VECTOR</span>
+        <span id="dossier-top-port" class="stat-value">--/TCP</span>
+        <span id="dossier-top-asn" class="stat-sub">ASN: N/A</span>
+      </div>
+    </div>
+
+    <div class="dossier-ratio-section">
+      <div class="dossier-ratio-labels">
+        <span id="dossier-ratio-out-lbl">OUTBOUND: 50%</span>
+        <span id="dossier-ratio-in-lbl">INBOUND: 50%</span>
+      </div>
+      <div class="leaderboard-bar-track gold-bar-track">
+        <div id="dossier-ratio-fill" class="leaderboard-bar-fill gold-bar-fill" style="width: 50%;"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Card 4: Detailed Attack Telemetry Dossier (Shown when a feed attack is clicked) -->
+  <aside id="attack-dossier-card" class="panel-card attack-dossier-card" style="display: none;">
+    <div class="panel-header attack-dossier-header">
+      <span class="panel-tag" id="atk-dossier-header-tag">INTRUSION TELEMETRY</span>
+      <button id="btn-close-attack-dossier" class="dossier-close-btn atk-close-btn" type="button" title="Deselect Attack">✕</button>
+    </div>
+
+    <div class="atk-identity-banner">
+      <div class="atk-id-main">
+        <span id="atk-dossier-malware" class="atk-malware-title">MALWARE</span>
+        <span id="atk-dossier-category" class="atk-category-sub">CATEGORY</span>
+      </div>
+      <span id="atk-dossier-sev-badge" class="atk-sev-badge">HIGH</span>
+    </div>
+
+    <!-- Full Route Breakdown (Origin -> Target) -->
+    <div class="atk-route-box">
+      <div class="atk-endpoint">
+        <div class="atk-ep-top">
+          <span class="atk-ep-role">ORIGIN HOST</span>
+          <span id="atk-dossier-src-ip" class="atk-ep-ip">0.0.0.0</span>
+        </div>
+        <div class="atk-ep-loc">
+          <img id="atk-dossier-src-flag" class="leaderboard-flag" src="" alt="Origin Flag" />
+          <span id="atk-dossier-src-loc">City, Country (ISO)</span>
+        </div>
+        <span id="atk-dossier-src-coords" class="atk-ep-coords">LAT: 0.0000° | LON: 0.0000°</span>
+      </div>
+
+      <div class="atk-route-divider">
+        <i class="fa-solid fa-angles-down"></i>
+        <span id="atk-dossier-distance">0 KM</span>
+      </div>
+
+      <div class="atk-endpoint">
+        <div class="atk-ep-top">
+          <span class="atk-ep-role">TARGET SENSOR</span>
+          <span id="atk-dossier-dst-port" class="atk-ep-ip">443 / TCP</span>
+        </div>
+        <div class="atk-ep-loc">
+          <img id="atk-dossier-dst-flag" class="leaderboard-flag" src="" alt="Target Flag" />
+          <span id="atk-dossier-dst-loc">City, Country (ISO)</span>
+        </div>
+        <span id="atk-dossier-dst-coords" class="atk-ep-coords">LAT: 0.0000° | LON: 0.0000°</span>
+      </div>
+    </div>
+
+    <!-- Complete Technical Metadata Grid (Clickable CVE & MITRE Links) -->
+    <div class="dossier-stats-grid atk-stats-grid">
+      <div class="dossier-stat-box atk-stat-box">
+        <span class="stat-label">VULNERABILITY (NVD)</span>
+        <a id="atk-dossier-cve" class="stat-value stat-link" href="#" target="_blank" rel="noopener noreferrer">
+          <span>CVE-N/A</span>
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </a>
+      </div>
+      <div class="dossier-stat-box atk-stat-box">
+        <span class="stat-label">MITRE ATT&amp;CK</span>
+        <a id="atk-dossier-mitre" class="stat-value stat-link" href="#" target="_blank" rel="noopener noreferrer">
+          <span>T1071</span>
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </a>
+      </div>
+      <div class="dossier-stat-box atk-stat-box">
+        <span class="stat-label">ORIGIN ASN</span>
+        <span id="atk-dossier-asn" class="stat-value">AS_EDGE</span>
+      </div>
+      <div class="dossier-stat-box atk-stat-box">
+        <span class="stat-label">CAPTURED AT</span>
+        <span id="atk-dossier-time" class="stat-value">00:00:00 UTC</span>
+      </div>
+    </div>
+
+    <!-- External Threat Intel Pivot Links & One-Click IOC Copy -->
+    <div class="atk-pivot-section">
+      <span class="pivot-section-label">EXTERNAL OSINT PIVOT &amp; TRIAGE</span>
+      <div class="atk-pivot-grid">
+        <a id="atk-pivot-vt" class="pivot-btn" href="#" target="_blank" rel="noopener noreferrer" title="Inspect IP on VirusTotal">
+          <i class="fa-solid fa-shield-virus"></i> VIRUSTOTAL
+        </a>
+        <a id="atk-pivot-abuse" class="pivot-btn" href="#" target="_blank" rel="noopener noreferrer" title="Inspect IP on AbuseIPDB">
+          <i class="fa-solid fa-biohazard"></i> ABUSEIPDB
+        </a>
+        <a id="atk-pivot-shodan" class="pivot-btn" href="#" target="_blank" rel="noopener noreferrer" title="Inspect Host on Shodan">
+          <i class="fa-solid fa-satellite"></i> SHODAN
+        </a>
+        <button id="btn-copy-ioc" class="pivot-btn copy-ioc-btn" type="button" title="Copy Full IOC Summary">
+          <i class="fa-regular fa-copy"></i> <span id="copy-ioc-label">COPY IOC</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+</div>

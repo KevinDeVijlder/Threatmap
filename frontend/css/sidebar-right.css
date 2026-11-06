@@ -1,0 +1,434 @@
+/* =====================================================================
+   RIGHT SIDEBAR: DUAL TOP 10 LEADERBOARDS & DOSSIER CARDS
+   ===================================================================== */
+
+.panel-card {
+  height: fit-content;
+  display: flex; flex-direction: column;
+  background: var(--color-hud-bg);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 6px; padding: 10px 12px;
+  backdrop-filter: blur(16px); box-shadow: var(--glass-shadow);
+  flex-shrink: 0;
+}
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.56rem; letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 5px; margin-bottom: 7px;
+}
+.panel-tag { color: rgba(255, 255, 255, 0.55); font-weight: 600; }
+.panel-status { color: var(--color-primary); font-weight: 700; }
+
+.leaderboard-list { display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; }
+.leaderboard-row {
+  display: flex; flex-direction: column; gap: 3px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 7px; border-radius: 4px;
+}
+.leaderboard-main { display: flex; justify-content: space-between; align-items: center; }
+.leaderboard-left { display: flex; align-items: center; gap: 7px; }
+.leaderboard-rank { font-size: 0.53rem; color: var(--color-primary); font-weight: 700; min-width: 17px; }
+.leaderboard-flag { width: 16px; height: 11px; object-fit: cover; border-radius: 1px; }
+.leaderboard-name { font-size: 0.58rem; color: #fff; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 165px; }
+.leaderboard-hits { font-size: 0.58rem; font-weight: 700; color: var(--color-primary); }
+
+.leaderboard-bar-track { width: 100%; height: 2.5px; background: rgba(255, 255, 255, 0.06); border-radius: 2px; overflow: hidden; }
+.leaderboard-bar-fill { height: 100%; background: var(--color-primary); box-shadow: 0 0 6px var(--color-primary); transition: width 0.3s ease; }
+
+/* Card 3: Gold Country Intelligence Dossier */
+.panel-card.gold-card {
+  border-color: var(--color-gold-border);
+  border-left: 3px solid var(--color-gold-bright);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 22px rgba(255, 184, 0, 0.16), inset 0 1px 0 rgba(255, 208, 0, 0.15);
+  animation: slideIn 0.22s ease-out;
+}
+
+.gold-header .panel-tag {
+  color: var(--color-gold-bright);
+  text-shadow: 0 0 8px var(--color-gold-glow);
+}
+
+.dossier-close-btn {
+  background: rgba(255, 184, 0, 0.12);
+  border: 1px solid rgba(255, 184, 0, 0.35);
+  color: var(--color-gold-bright);
+  font-size: 0.62rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.dossier-close-btn:hover {
+  background: var(--color-gold-bright);
+  color: #040d21;
+  box-shadow: 0 0 10px var(--color-gold-glow);
+}
+
+.dossier-identity {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 184, 0, 0.06);
+  border: 1px solid rgba(255, 184, 0, 0.22);
+  padding: 7px 9px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.dossier-id-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.dossier-flag {
+  width: 28px;
+  height: 19px;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 208, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.dossier-title-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dossier-country-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dossier-iso-sub {
+  font-size: 0.50rem;
+  color: var(--color-gold);
+  letter-spacing: 0.05em;
+}
+
+.dossier-threat-badge {
+  font-size: 0.50rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 184, 0, 0.18);
+  border: 1px solid var(--color-gold-bright);
+  color: var(--color-gold-bright);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(255, 184, 0, 0.25);
+}
+
+.dossier-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.dossier-stat-box {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 184, 0, 0.16);
+  padding: 6px 8px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dossier-stat-box .stat-label {
+  font-size: 0.48rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.06em;
+}
+
+.dossier-stat-box .stat-value {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--color-gold-bright);
+  text-shadow: 0 0 8px rgba(255, 184, 0, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dossier-stat-box .stat-sub {
+  font-size: 0.48rem;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dossier-ratio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dossier-ratio-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.50rem;
+  font-weight: 700;
+  color: var(--color-gold);
+  letter-spacing: 0.05em;
+}
+
+.gold-bar-track {
+  height: 4px;
+  background: rgba(255, 184, 0, 0.14);
+}
+
+.gold-bar-fill {
+  background: linear-gradient(90deg, var(--color-gold-bright) 0%, #ff9900 100%);
+  box-shadow: 0 0 8px var(--color-gold-glow);
+}
+
+/* =====================================================================
+   CARD 4: DETAILED ATTACK TELEMETRY DOSSIER & OSINT PIVOTS
+   ===================================================================== */
+.panel-card.attack-dossier-card {
+  --atk-accent: var(--color-primary);
+  border-color: rgba(0, 240, 255, 0.38);
+  border-left: 3px solid var(--atk-accent);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 111, 255, 0.2);
+  animation: slideIn 0.22s ease-out;
+}
+
+.panel-card.attack-dossier-card.sev-high { --atk-accent: var(--color-high); border-color: rgba(255, 94, 54, 0.45); }
+.panel-card.attack-dossier-card.sev-med  { --atk-accent: var(--color-med);  border-color: rgba(255, 184, 0, 0.45); }
+.panel-card.attack-dossier-card.sev-low  { --atk-accent: var(--color-low);  border-color: rgba(0, 163, 255, 0.45); }
+
+.attack-dossier-header .panel-tag {
+  color: var(--atk-accent);
+  font-weight: 700;
+}
+
+.atk-close-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--atk-accent);
+  color: var(--atk-accent);
+}
+.atk-close-btn:hover {
+  background: var(--atk-accent);
+  color: #040d21;
+  box-shadow: 0 0 10px var(--atk-accent);
+}
+
+.atk-identity-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 7px 9px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.atk-id-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.atk-malware-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--atk-accent);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atk-category-sub {
+  font-size: 0.48rem;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.06em;
+}
+
+.atk-sev-badge {
+  font-size: 0.50rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--atk-accent);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.atk-route-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(3, 8, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 8px 9px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.atk-endpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.atk-ep-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.atk-ep-role {
+  font-size: 0.46rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.08em;
+}
+
+.atk-ep-ip {
+  font-size: 0.54rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.atk-ep-loc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.60rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.atk-ep-coords {
+  font-size: 0.48rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.atk-route-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+  padding: 3px 4px;
+  font-size: 0.48rem;
+  font-weight: 700;
+  color: var(--atk-accent);
+}
+
+.atk-stats-grid {
+  margin-bottom: 8px;
+}
+
+.dossier-stat-box.atk-stat-box {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dossier-stat-box.atk-stat-box .stat-value {
+  color: #ffffff;
+  text-shadow: none;
+  font-size: 0.60rem;
+}
+
+/* Clickable CVE & MITRE Links inside Attack Dossier */
+.stat-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  color: var(--color-accent) !important;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.stat-link i {
+  font-size: 0.48rem;
+  opacity: 0.75;
+}
+.stat-link:hover {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px var(--color-accent) !important;
+}
+
+/* External Threat Intel Pivot Bar & Copy IOC Button */
+.atk-pivot-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 7px;
+}
+
+.pivot-section-label {
+  font-size: 0.46rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.08em;
+}
+
+.atk-pivot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.pivot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: rgba(0, 111, 255, 0.1);
+  border: 1px solid rgba(0, 111, 255, 0.32);
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: 0.50rem;
+  font-weight: 700;
+  padding: 6px 6px;
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: all 0.15s ease;
+}
+
+.pivot-btn:hover {
+  background: rgba(0, 111, 255, 0.25);
+  border-color: var(--color-accent);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 111, 255, 0.3);
+}
+
+.pivot-btn.copy-ioc-btn {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.35);
+  color: var(--color-accent);
+}
+.pivot-btn.copy-ioc-btn:hover {
+  background: rgba(0, 240, 255, 0.24);
+  color: #ffffff;
+}
+.pivot-btn.copy-ioc-btn.copied {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+  color: #34d399;
+}

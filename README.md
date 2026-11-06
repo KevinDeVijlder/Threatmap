@@ -28,17 +28,52 @@ Unlike static mockups, this application ingests **live, unauthenticated Open-Sou
 soc-threat-map/
 ├── backend/
 │   ├── data/
-│   │   └── GeoLite2-City.mmdb    # Optional local MaxMind GeoIP binary
-│   ├── main.py                   # FastAPI OSINT collector & WebSocket server
-│   └── requirements.txt          # Python dependencies
+│   │   └── GeoLite2-City.mmdb        # Optional local MaxMind GeoIP binary
+│   ├── routes/
+│   │   ├── auth.py                   # Authentication & user profile REST API
+│   │   └── websocket.py              # Real-time WebSocket stream endpoint
+│   ├── services/
+│   │   ├── geolocation.py            # Batch IP geolocation & dynamic target resolver
+│   │   ├── osint_collector.py        # Public & custom OSINT feed ingestion worker
+│   │   └── taxonomy.py               # Malware taxonomy, MITRE/CVE enrichment & event builder
+│   ├── config.py                     # Paths, constants & logging setup
+│   ├── database.py                   # SQLite user, session & custom feed persistence
+│   ├── main.py                       # FastAPI application entrypoint
+│   ├── models.py                     # Pydantic request validation schemas
+│   ├── ws_manager.py                 # WebSocket connection & feed mode manager
+│   └── requirements.txt              # Python dependencies
 ├── frontend/
 │   ├── css/
-│   │   └── style.css             # Tactical HUD & Electric Blue theme
+│   │   ├── style.css                 # Main stylesheet entry point (@import aggregator)
+│   │   ├── variables.css             # Theme tokens, global reset & animations
+│   │   ├── header.css                # Top telemetry HUD, mode switcher & cursor tooltip
+│   │   ├── sidebar-left.css          # Intrusion feed, controls, search & country bar
+│   │   ├── sidebar-right.css         # Top 10 leaderboards, country & attack dossiers
+│   │   └── modal.css                 # Operator authentication & custom feeds modal
 │   ├── data/
-│   │   └── countries-110m.json   # Natural Earth TopoJSON vector dataset
+│   │   └── countries-110m.json       # Natural Earth TopoJSON vector dataset
 │   ├── js/
-│   │   └── main.js               # Vector map, hit-mask & ballistic arc engine
-│   └── index.html                # Main SOC dashboard layout
+│   │   ├── components/
+│   │   │   ├── authController.js     # Auth, operator profile & custom feed CRUD
+│   │   │   ├── dossierController.js  # Country & attack dossiers, OSINT pivots & IOC copy
+│   │   │   ├── feedController.js     # Live ticker, filter, search, pause & JSON/CSV export
+│   │   │   ├── leaderboardController.js # Dual Top 10 leaderboards & localStorage stats
+│   │   │   └── mapRenderer.js        # 2D vector map, RGB hit-mask & ballistic arcs
+│   │   ├── data/
+│   │   │   └── countries.js          # ISO 3166-1 country lookup & metadata resolver
+│   │   ├── services/
+│   │   │   └── socketService.js      # WebSocket client & mode synchronization
+│   │   ├── utils/
+│   │   │   ├── helpers.js            # Severity bucket, Bezier math & Haversine utilities
+│   │   │   └── partialLoader.js      # HTML partial template loader
+│   │   ├── config.js                 # Frontend canvas, color & endpoint configuration
+│   │   └── main.js                   # Main ThreatMap application orchestrator
+│   ├── partials/
+│   │   ├── header.html               # Top telemetry HUD & operator profile menu
+│   │   ├── sidebar-left.html         # Real-time intrusion feed & country intel bar
+│   │   ├── sidebar-right.html        # Dual Top 10 leaderboards & intelligence dossiers
+│   │   └── modal.html                # Operator authentication & custom feeds modal
+│   └── index.html                    # Main SOC dashboard shell
 ├── .gitignore
 └── README.md
 ```

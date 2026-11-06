@@ -1,0 +1,71 @@
+<!-- Floating Country Cursor Tooltip -->
+<div id="cursor-tooltip" class="cursor-tooltip">
+  <img id="cursor-tooltip-flag" class="cursor-tooltip-flag" src="" alt="Flag" />
+  <span id="cursor-tooltip-name" class="cursor-tooltip-name"></span>
+</div>
+
+<!-- Top Telemetry Header -->
+<header class="hud-header">
+  <div class="hud-mode-switcher">
+    <button id="btn-mode-live" class="mode-btn active" type="button">
+      <span id="conn-status" class="mode-dot"></span>
+      <span>LIVE INTEL FEED</span>
+    </button>
+
+    <div id="custom-mode-wrapper" class="custom-mode-wrapper locked">
+      <button id="btn-mode-custom" class="mode-btn inactive locked" type="button" disabled>
+        <span class="mode-dot custom-dot"></span>
+        <span>CUSTOM INTEL FEED</span>
+      </button>
+      <div id="custom-feed-tooltip" class="custom-feed-tooltip">
+        <i class="fa-solid fa-lock"></i>
+        <span>REGISTER OR LOGIN TO USE CUSTOM FEEDS</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud-right-group">
+    <div class="hud-telemetry">
+      <div class="telemetry-block">
+        <span class="label">TOTAL ATTACKS COUNTED</span>
+        <span class="value" id="hud-attacks-total">0</span>
+      </div>
+      <div class="telemetry-block">
+        <span class="label">ACTIVE ORIGINS</span>
+        <span class="value" id="hud-active-origins">0 REGIONS</span>
+      </div>
+      <div class="telemetry-block">
+        <span class="label">UTC TIME</span>
+        <span class="value" id="hud-clock">00:00:00</span>
+      </div>
+    </div>
+
+    <div class="user-profile-wrapper">
+      <button id="btn-user-profile" class="user-btn logged-out" type="button" aria-label="User Account">
+        <img id="user-avatar-img" class="user-avatar-img" src="" alt="Avatar" style="display: none;" />
+        <i id="user-default-icon" class="fa-solid fa-user-astronaut user-fa-icon"></i>
+        <span id="user-auth-dot" class="user-auth-dot"></span>
+      </button>
+
+      <div class="user-dropdown-bridge">
+        <div class="user-dropdown-menu">
+          <div class="user-dropdown-header">
+            <span id="dropdown-user-status" class="dropdown-status-label">UNAUTHENTICATED SESSION</span>
+          </div>
+          <button id="menu-btn-account" class="user-menu-btn" type="button">
+            <i id="menu-icon-account" class="fa-solid fa-user-plus"></i>
+            <span id="menu-text-account">REGISTER / LOGIN</span>
+          </button>
+          <button id="menu-btn-feeds" class="user-menu-btn disabled" type="button">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <span>CUSTOM FEED SETTINGS</span>
+          </button>
+          <button id="menu-btn-logout" class="user-menu-btn disabled" type="button">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>LOGOUT</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,58 @@
+<!-- Left Sidebar Column -->
+<aside class="sidebar-column left-column">
+  <div class="deck-feed-card">
+    <div class="feed-header">
+      <span class="feed-tag">REAL-TIME INTRUSION FEED</span>
+      <span class="feed-status" id="feed-mode-label">LIVE OSINT STREAM</span>
+    </div>
+
+    <!-- Stream Controls: Pause/Resume & Export JSON/CSV -->
+    <div class="feed-Action-bar">
+      <button id="btn-pause-stream" class="stream-ctrl-btn" type="button" title="Pause / Resume Live Stream">
+        <i id="pause-icon" class="fa-solid fa-pause"></i>
+        <span id="pause-label">PAUSE</span>
+      </button>
+      <div class="export-btn-group">
+        <button id="btn-export-json" class="stream-ctrl-btn export-btn" type="button" title="Export Captured Packets as JSON">
+          <i class="fa-solid fa-file-code"></i> JSON
+        </button>
+        <button id="btn-export-csv" class="stream-ctrl-btn export-btn" type="button" title="Export Captured Packets as CSV">
+          <i class="fa-solid fa-file-csv"></i> CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Search Bar -->
+    <div class="feed-search-box">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input id="feed-search-input" type="text" placeholder="Filter threat, IP, port, ASN, country..." autocomplete="off" />
+      <button id="btn-clear-search" class="search-clear-btn" type="button" style="display: none;" title="Clear Search">✕</button>
+    </div>
+
+    <!-- Severity Filter Bar -->
+    <div class="feed-filter-bar">
+      <button class="filter-chip active" data-severity="ALL" type="button">ALL</button>
+      <button class="filter-chip" data-severity="HIGH" type="button">HIGH</button>
+      <button class="filter-chip" data-severity="MEDIUM" type="button">MED</button>
+      <button class="filter-chip" data-severity="LOW" type="button">LOW</button>
+    </div>
+
+    <div id="attack-ticker" class="attack-ticker">
+      <div class="ticker-empty">LISTENING FOR OSINT INTRUSIONS...</div>
+    </div>
+  </div>
+
+  <div id="country-intel" class="deck-intel-bar idle">
+    <div class="intel-left">
+      <div class="flag-wrapper">
+        <img id="country-flag" class="country-flag" src="" alt="Flag" style="display: none;" />
+        <div id="flag-placeholder" class="flag-placeholder">🌐</div>
+      </div>
+      <div class="intel-meta">
+        <span id="country-name" class="intel-country">STANDBY</span>
+        <span id="country-code" class="intel-code">ISO</span>
+      </div>
+    </div>
+    <div id="coords-hud" class="coords-display">00.00° | 00.00°</div>
+  </div>
+</aside>

@@ -1,0 +1,69 @@
+/* =====================================================================
+   DESIGN TOKENS, GLOBAL RESET, CANVAS BASE & KEYFRAME ANIMATIONS
+   ===================================================================== */
+
+:root {
+  --color-primary: #006FFF;                 /* UniFi Electric Blue */
+  --color-primary-glow: rgba(0, 111, 255, 0.65);
+  --color-accent: #00F0FF;                  /* Neon Cyan */
+
+  /* Gold Country Dossier Theme Tokens */
+  --color-gold: #FFB800;
+  --color-gold-bright: #FFD000;
+  --color-gold-glow: rgba(255, 184, 0, 0.55);
+  --color-gold-border: rgba(255, 184, 0, 0.42);
+
+  /* Cyber-Blue Ocean Background Tokens */
+  --color-bg-center: #081938;
+  --color-bg-mid: #040d21;
+  --color-bg-edge: #020610;
+
+  --color-hud-bg: rgba(6, 15, 32, 0.82);
+  --color-border: rgba(0, 111, 255, 0.38);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(0, 170, 255, 0.12);
+  --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
+
+  /* Cohesive 3-Level Cyber Telemetry Palette */
+  --color-high: #FF5E36;                    /* Cyber Flame Coral (High / Critical) */
+  --color-med: #FFB800;                     /* Solar Amber Gold (Medium) */
+  --color-low: #00A3FF;                     /* Electric Azure Blue (Low / Info) */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(0, 111, 255, 0.18) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, var(--color-bg-center) 0%, var(--color-bg-mid) 60%, var(--color-bg-edge) 100%);
+  font-family: var(--font-mono);
+  color: #e2e8f0;
+}
+
+#threat-map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+  cursor: crosshair;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 14px var(--color-primary); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
