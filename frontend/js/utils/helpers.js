@@ -9,12 +9,12 @@
 import { CONFIG } from "../config.js";
 
 export const PIN_TYPES = {
-  "#00F0FF": {
+  "#A855F7": {
     key: "CITY",
     label: "DEFAULT CITY",
     faClass: "fa-city",
     unicode: "\uf64f",
-    color: "#00F0FF",
+    color: "#A855F7",
   },
   "#006FFF": {
     key: "SOC_CORE",
@@ -47,8 +47,9 @@ export const PIN_TYPES = {
 };
 
 export function getPinTypeMeta(color) {
-  const norm = (color || "#00F0FF").toUpperCase();
-  return PIN_TYPES[norm] || PIN_TYPES["#00F0FF"];
+  const norm = (color || "#A855F7").toUpperCase();
+  if (norm === "#00F0FF") return PIN_TYPES["#A855F7"];
+  return PIN_TYPES[norm] || PIN_TYPES["#A855F7"];
 }
 
 export function resolveSeverityBucket(data) {
@@ -79,7 +80,7 @@ export function resolveSeverityBucket(data) {
 export function getBucketColor(bucket) {
   if (bucket === "HIGH") return CONFIG.colorHigh;     // #FF5E36 (Cyber Flame Coral)
   if (bucket === "MEDIUM") return CONFIG.colorMed;    // #FFB800 (Solar Amber Gold)
-  return CONFIG.colorLow;                             // #00A3FF (Electric Azure Blue)
+  return CONFIG.colorLow;                             // #006FFF (Primary Electric Blue)
 }
 
 export function calculateDistanceKm(lat1, lon1, lat2, lon2) {

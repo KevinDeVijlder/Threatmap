@@ -19,8 +19,13 @@ class AvatarUpdateRequest(BaseModel):
     avatar: str
 
 
+class PasswordUpdateRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class CustomSourcesUpdateRequest(BaseModel):
-    custom_sources: List[Dict[str, str]]
+    custom_sources: List[Dict[str, Any]]
 
 
 class CustomLocationsUpdateRequest(BaseModel):

@@ -203,7 +203,7 @@
    ===================================================================== */
 .panel-card.attack-dossier-card {
   --atk-accent: var(--color-primary);
-  border-color: rgba(0, 240, 255, 0.38);
+  border-color: rgba(0, 111, 255, 0.42);
   border-left: 3px solid var(--atk-accent);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 111, 255, 0.2);
   animation: slideIn 0.22s ease-out;
@@ -211,7 +211,7 @@
 
 .panel-card.attack-dossier-card.sev-high { --atk-accent: var(--color-high); border-color: rgba(255, 94, 54, 0.45); }
 .panel-card.attack-dossier-card.sev-med  { --atk-accent: var(--color-med);  border-color: rgba(255, 184, 0, 0.45); }
-.panel-card.attack-dossier-card.sev-low  { --atk-accent: var(--color-low);  border-color: rgba(0, 163, 255, 0.45); }
+.panel-card.attack-dossier-card.sev-low  { --atk-accent: var(--color-low);  border-color: rgba(0, 111, 255, 0.45); }
 
 .attack-dossier-header .panel-tag {
   color: var(--atk-accent);
@@ -419,12 +419,12 @@
 }
 
 .pivot-btn.copy-ioc-btn {
-  background: rgba(0, 240, 255, 0.1);
-  border-color: rgba(0, 240, 255, 0.35);
+  background: rgba(0, 111, 255, 0.14);
+  border-color: rgba(0, 111, 255, 0.42);
   color: var(--color-accent);
 }
 .pivot-btn.copy-ioc-btn:hover {
-  background: rgba(0, 240, 255, 0.24);
+  background: rgba(0, 111, 255, 0.28);
   color: #ffffff;
 }
 .pivot-btn.copy-ioc-btn.copied {

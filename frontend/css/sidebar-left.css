@@ -136,7 +136,7 @@
 
 #feed-search-input:focus {
   border-color: var(--color-accent);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 111, 255, 0.25);
 }
 
 .search-clear-btn {
@@ -199,10 +199,10 @@
   box-shadow: 0 0 10px rgba(255, 184, 0, 0.25);
 }
 .filter-chip.active[data-severity="LOW"] {
-  background: rgba(0, 163, 255, 0.18);
+  background: rgba(0, 111, 255, 0.22);
   border-color: var(--color-low);
   color: #ffffff;
-  box-shadow: 0 0 10px rgba(0, 163, 255, 0.25);
+  box-shadow: 0 0 10px rgba(0, 111, 255, 0.3);
 }
 
 /* Pinned IPs Only Filter Button */
@@ -212,8 +212,8 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  background: rgba(0, 240, 255, 0.05);
-  border: 1px solid rgba(0, 240, 255, 0.24);
+  background: rgba(0, 111, 255, 0.08);
+  border: 1px solid rgba(0, 111, 255, 0.28);
   color: rgba(255, 255, 255, 0.72);
   font-family: var(--font-mono);
   font-size: 0.52rem;
@@ -228,7 +228,7 @@
 }
 
 .pinned-ip-filter-btn:hover {
-  background: rgba(0, 240, 255, 0.12);
+  background: rgba(0, 111, 255, 0.16);
   border-color: var(--color-accent);
   color: #ffffff;
 }
@@ -254,10 +254,10 @@
 }
 
 .pinned-ip-filter-btn.active {
-  background: rgba(0, 240, 255, 0.18);
+  background: rgba(0, 111, 255, 0.24);
   border-color: var(--color-accent);
   color: #ffffff;
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.28);
+  box-shadow: 0 0 12px rgba(0, 111, 255, 0.34);
 }
 
 .pinned-ip-filter-btn.active .pinned-filter-state {
@@ -310,9 +310,9 @@
 .ticker-row.sev-low  { border-left-color: var(--color-low); }
 
 .ticker-row.selected {
-  background: rgba(0, 111, 255, 0.16);
+  background: rgba(0, 111, 255, 0.18);
   border-color: var(--color-accent);
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.28), inset 0 0 10px rgba(0, 111, 255, 0.18);
+  box-shadow: 0 0 16px rgba(0, 111, 255, 0.35), inset 0 0 10px rgba(0, 111, 255, 0.2);
 }
 
 .ticker-title-row {
@@ -340,7 +340,7 @@
 }
 .ticker-row.sev-low .ticker-title {
   color: var(--color-low);
-  text-shadow: 0 0 10px rgba(0, 163, 255, 0.35);
+  text-shadow: 0 0 10px rgba(0, 111, 255, 0.4);
 }
 
 .ticker-lock-hint {
@@ -511,8 +511,8 @@
   width: 18px;
   height: 16px;
   border-radius: 3px;
-  background: rgba(0, 240, 255, 0.12);
-  border: 1px solid rgba(0, 240, 255, 0.35);
+  background: rgba(0, 111, 255, 0.14);
+  border: 1px solid rgba(0, 111, 255, 0.4);
   color: rgba(255, 255, 255, 0.65);
   font-size: 0.48rem;
   cursor: pointer;
@@ -525,8 +525,8 @@
 .pinned-hud-filter-btn.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #030816;
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.45);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(0, 111, 255, 0.5);
 }
 
 /* Global Node Alarm Indicator next to the Legend */
@@ -695,4 +695,110 @@
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(-16deg); }
   75% { transform: rotate(16deg); }
+}
+
+/* =====================================================================
+   FLOATING MAP ZOOM & PAN CONTROLS
+   ===================================================================== */
+
+.map-zoom-controls {
+  position: absolute;
+  right: 352px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-hud-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px;
+  backdrop-filter: blur(16px);
+  box-shadow: var(--glass-shadow);
+  z-index: 25;
+  pointer-events: auto;
+}
+
+.zoom-ctrl-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 111, 255, 0.12);
+  border: 1px solid rgba(0, 111, 255, 0.35);
+  color: var(--color-accent);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-ctrl-btn:hover {
+  background: rgba(0, 111, 255, 0.28);
+  border-color: var(--color-accent);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 111, 255, 0.35);
+}
+
+.zoom-level-badge {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.04em;
+  padding: 2px 0;
+  user-select: none;
+}
+
+.zoom-ctrl-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 2px 0;
+}
+
+.borders-toggle-btn {
+  width: auto;
+  min-width: 44px;
+  height: auto;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 4px;
+  font-family: var(--font-mono);
+  font-size: 0.42rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.borders-toggle-btn i {
+  font-size: 0.62rem;
+}
+
+.borders-toggle-btn.active {
+  background: rgba(0, 111, 255, 0.26);
+  border-color: var(--color-accent);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 111, 255, 0.42);
+}
+
+.borders-toggle-btn.active i {
+  color: var(--color-accent);
+}
+
+#threat-map.is-zoomed {
+  cursor: grab;
+}
+
+#threat-map.is-panning {
+  cursor: grabbing;
+}
+
+.pinned-node-row {
+  cursor: pointer;
+}
+.pinned-node-row:hover {
+  background: rgba(0, 111, 255, 0.14);
+  border-color: rgba(0, 111, 255, 0.42);
 }

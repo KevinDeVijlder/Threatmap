@@ -29,11 +29,8 @@ export class ThreatMap {
     this.canvas = document.getElementById("threat-map");
     this.ctx = this.canvas.getContext("2d");
 
-    this.btnModeLive = document.getElementById("btn-mode-live");
-    this.btnModeCustom = document.getElementById("btn-mode-custom");
-    this.customModeWrapper = document.getElementById("custom-mode-wrapper");
+    this.feedStreamStatus = document.getElementById("feed-stream-status");
     this.feedModeLabel = document.getElementById("feed-mode-label");
-    this.activeFeedMode = "live";
 
     // Filter, Search & Stream Freeze States
     this.currentSeverityFilter = "ALL";
@@ -61,6 +58,11 @@ export class ThreatMap {
     this.pinnedAlarmIcon = document.getElementById("pinned-alarm-icon");
     this.pinnedAlarmText = document.getElementById("pinned-alarm-text");
     this.pinnedNodesList = document.getElementById("pinned-nodes-list");
+    this.btnZoomIn = document.getElementById("btn-zoom-in");
+    this.btnZoomOut = document.getElementById("btn-zoom-out");
+    this.btnZoomReset = document.getElementById("btn-zoom-reset");
+    this.zoomLevelLabel = document.getElementById("zoom-level-label");
+    this.btnToggleBorders = document.getElementById("btn-toggle-borders");
 
     this.hudAttacksTotal = document.getElementById("hud-attacks-total");
     this.hudActiveOrigins = document.getElementById("hud-active-origins");
@@ -71,10 +73,11 @@ export class ThreatMap {
     this.userAvatarImg = document.getElementById("user-avatar-img");
     this.userDefaultIcon = document.getElementById("user-default-icon");
     this.dropdownUserStatus = document.getElementById("dropdown-user-status");
-    this.menuBtnAccount = document.getElementById("menu-btn-account");
-    this.menuIconAccount = document.getElementById("menu-icon-account");
-    this.menuTextAccount = document.getElementById("menu-text-account");
+    this.dropdownLoginLink = document.getElementById("dropdown-login-link");
+    this.menuBtnOperator = document.getElementById("menu-btn-operator");
+    this.menuBtnLocations = document.getElementById("menu-btn-locations");
     this.menuBtnFeeds = document.getElementById("menu-btn-feeds");
+    this.menuBtnGithub = document.getElementById("menu-btn-github");
     this.menuBtnLogout = document.getElementById("menu-btn-logout");
 
     this.authToken = localStorage.getItem("soc_auth_token") || null;
@@ -144,9 +147,13 @@ export class ThreatMap {
     this.copyIocLabel = document.getElementById("copy-ioc-label");
 
     this.countryFeatures = [];
+    this.smallCountryFeatures = [];
     this.featureCollection = null;
     this.mergedLandGeo = null;
     this.coastlineMesh = null;
+    this.bordersMesh = null;
+    this.showCountryBorders =
+      localStorage.getItem("soc_show_borders") === "true";
     this.pixelRatio = window.devicePixelRatio || 1;
 
     this.projection = null;
@@ -462,6 +469,10 @@ export class ThreatMap {
         data.srcCity && data.srcCity !== "Unknown"
           ? data.srcCity
           : data.srcCountry,
+      targetCityName:
+        data.dstCity && data.dstCity !== "Unknown"
+          ? data.dstCity
+          : data.dstCountry,
       data: data,
     });
 

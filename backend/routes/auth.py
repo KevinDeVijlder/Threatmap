@@ -19,6 +19,7 @@ from database import (
     get_user_by_token,
     update_user_avatar,
     update_user_locations,
+    update_user_password,
     update_user_sources,
 )
 from models import (
@@ -27,6 +28,7 @@ from models import (
     CustomLocationsUpdateRequest,
     CustomSourcesUpdateRequest,
     GeolocateIpRequest,
+    PasswordUpdateRequest,
 )
 from ws_manager import manager
 
@@ -81,6 +83,20 @@ async def update_avatar(
     return {"user": user}
 
 
+@router.post("/profile/password")
+async def change_password(
+    req: PasswordUpdateRequest, authorization: Optional[str] = Header(None)
+):
+    user = get_user_by_token(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    if len(req.new_password) < 4:
+        raise HTTPException(status_code=400, detail="New password must be at least 4 characters.")
+    if not update_user_password(user["id"], req.current_password, req.new_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    return {"status": "ok"}
+
+
 @router.post("/profile/sources")
 async def update_custom_sources(
     req: CustomSourcesUpdateRequest, authorization: Optional[str] = Header(None)
@@ -89,9 +105,9 @@ async def update_custom_sources(
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated.")
 
-    update_user_sources(user["id"], req.custom_sources)
+    normalized = update_user_sources(user["id"], req.custom_sources)
     manager.invalidate_user_cache(user["id"])
-    user["custom_sources"] = req.custom_sources
+    user["custom_sources"] = normalized
     return {"user": user}
 
 

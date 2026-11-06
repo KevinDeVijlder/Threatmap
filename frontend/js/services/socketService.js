@@ -2,7 +2,7 @@
  * WebSocket Telemetry Service
  * ===========================
  * Manages the WebSocket connection lifecycle, automatic reconnection,
- * status indicator updates, and live/custom feed mode synchronization.
+ * status indicator updates, and session token synchronization.
  */
 
 import { CONFIG } from "../config.js";
@@ -18,17 +18,16 @@ export class SocketService {
 
       this.app.ws.onopen = () => {
         this.app.isWsConnected = true;
-        this.app.connStatus.style.backgroundColor = "#006FFF";
-        this.sendModeUpdate();
+        if (this.app.connStatus) {
+          this.app.connStatus.style.backgroundColor = "#006FFF";
+        }
+        this.sendAuthUpdate();
       };
 
       this.app.ws.onmessage = (event) => {
         try {
           if (this.app.isStreamPaused) return;
           const payload = JSON.parse(event.data);
-          if (payload.feedMode && payload.feedMode !== this.app.activeFeedMode) {
-            return;
-          }
           this.app.triggerAttack(payload);
         } catch (err) {
           console.error("Failed to parse event:", err);
@@ -37,7 +36,9 @@ export class SocketService {
 
       this.app.ws.onclose = () => {
         this.app.isWsConnected = false;
-        this.app.connStatus.style.backgroundColor = "#FFB800";
+        if (this.app.connStatus) {
+          this.app.connStatus.style.backgroundColor = "#FFB800";
+        }
         setTimeout(() => this.connect(), 4000);
       };
 
@@ -49,15 +50,18 @@ export class SocketService {
     }
   }
 
-  sendModeUpdate() {
+  sendAuthUpdate() {
     if (this.app.ws && this.app.ws.readyState === WebSocket.OPEN) {
       this.app.ws.send(
         JSON.stringify({
-          action: "set_mode",
-          mode: this.app.activeFeedMode,
+          action: "auth",
           token: this.app.authToken,
         })
       );
     }
+  }
+
+  sendModeUpdate() {
+    this.sendAuthUpdate();
   }
 }

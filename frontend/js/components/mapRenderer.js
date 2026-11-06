@@ -8,6 +8,7 @@
  */
 
 import { CONFIG } from "../config.js";
+import { buildSmallCountryFeatures } from "../data/countries.js";
 import { getBezierPoint, getBucketColor, getPinTypeMeta } from "../utils/helpers.js";
 
 export class MapRenderer {
@@ -16,6 +17,99 @@ export class MapRenderer {
     this.lastMouseX = -1;
     this.lastMouseY = -1;
     this.lastAlarmSignature = "";
+
+    // Map Zoom & Pan State (geography scales; pins, badges, and arcs remain 1:1)
+    this.zoomScale = 1.0;
+    this.minZoom = 1.0;
+    this.maxZoom = 12.0;
+    this.panX = 0;
+    this.panY = 0;
+    this.isPanning = false;
+    this.panStartX = 0;
+    this.panStartY = 0;
+    this.panOriginX = 0;
+    this.panOriginY = 0;
+    this.didDrag = false;
+  }
+
+  baseToScreen(baseX, baseY) {
+    return [
+      baseX * this.zoomScale + this.panX,
+      baseY * this.zoomScale + this.panY,
+    ];
+  }
+
+  screenToBase(screenX, screenY) {
+    return [
+      (screenX - this.panX) / this.zoomScale,
+      (screenY - this.panY) / this.zoomScale,
+    ];
+  }
+
+  projectToScreen(lonLat) {
+    if (!this.app.projection) return null;
+    const pt = this.app.projection(lonLat);
+    if (!pt) return null;
+    return this.baseToScreen(pt[0], pt[1]);
+  }
+
+  clampPan() {
+    if (this.zoomScale <= 1.001) {
+      this.zoomScale = 1.0;
+      this.panX = 0;
+      this.panY = 0;
+      return;
+    }
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const minX = w * (1 - this.zoomScale);
+    const minY = h * (1 - this.zoomScale);
+    this.panX = Math.min(0, Math.max(minX, this.panX));
+    this.panY = Math.min(0, Math.max(minY, this.panY));
+  }
+
+  updateZoomHudDOM() {
+    if (this.app.zoomLevelLabel) {
+      this.app.zoomLevelLabel.textContent = `${this.zoomScale.toFixed(1)}x`;
+    }
+    if (this.app.canvas) {
+      this.app.canvas.classList.toggle("is-zoomed", this.zoomScale > 1.01);
+    }
+  }
+
+  zoomAtPoint(newScale, pivotX, pivotY) {
+    const targetScale = Math.min(
+      this.maxZoom,
+      Math.max(this.minZoom, newScale)
+    );
+    const [baseX, baseY] = this.screenToBase(pivotX, pivotY);
+    this.zoomScale = targetScale;
+    this.panX = pivotX - baseX * this.zoomScale;
+    this.panY = pivotY - baseY * this.zoomScale;
+    this.clampPan();
+    this.updateZoomHudDOM();
+  }
+
+  resetZoom() {
+    this.zoomScale = 1.0;
+    this.panX = 0;
+    this.panY = 0;
+    this.updateZoomHudDOM();
+  }
+
+  focusLocation(loc, targetScale = 4.0) {
+    if (!loc || !this.app.projection) return;
+    const lon = parseFloat(loc.lon);
+    const lat = parseFloat(loc.lat);
+    if (Number.isNaN(lon) || Number.isNaN(lat)) return;
+    const basePt = this.app.projection([lon, lat]);
+    if (!basePt) return;
+
+    this.zoomScale = Math.min(this.maxZoom, Math.max(this.minZoom, targetScale));
+    this.panX = window.innerWidth / 2 - basePt[0] * this.zoomScale;
+    this.panY = window.innerHeight / 2 - basePt[1] * this.zoomScale;
+    this.clampPan();
+    this.updateZoomHudDOM();
   }
 
   async loadCartography() {
@@ -33,20 +127,37 @@ export class MapRenderer {
       }
 
       const allFeatures = topojson.feature(data, data.objects.countries).features;
-      this.app.countryFeatures = allFeatures.filter(
+      const baseFeatures = allFeatures.filter(
         (feature) => parseInt(feature.id, 10) !== 10
       );
 
+      // Projection fitExtent uses the base 110m countries so initial framing stays identical
       this.app.featureCollection = {
         type: "FeatureCollection",
-        features: this.app.countryFeatures,
+        features: baseFeatures,
       };
+
+      const existingIds = new Set(
+        baseFeatures
+          .map((f) => parseInt(f.id, 10))
+          .filter((id) => !Number.isNaN(id))
+      );
+
+      // Build smaller sovereign nations, microstates & islands omitted from 1:110m
+      const smallFeatures = buildSmallCountryFeatures(existingIds);
+
+      this.app.countryFeatures = [...baseFeatures, ...smallFeatures];
+      this.app.countryFeatures.forEach((f, idx) => {
+        f._countryIdx = idx + 1;
+      });
+      this.app.smallCountryFeatures = smallFeatures;
 
       const nonAntarcticGeoms = data.objects.countries.geometries.filter(
         (g) => parseInt(g.id, 10) !== 10
       );
       this.app.mergedLandGeo = topojson.merge(data, nonAntarcticGeoms);
 
+      // Exterior coastlines (a === b)
       this.app.coastlineMesh = topojson.mesh(
         data,
         data.objects.countries,
@@ -54,6 +165,17 @@ export class MapRenderer {
           const idA = parseInt(a.id, 10);
           const idB = parseInt(b.id, 10);
           return a === b && idA !== 10 && idB !== 10;
+        }
+      );
+
+      // Interior country borders between adjacent nations (a !== b)
+      this.app.bordersMesh = topojson.mesh(
+        data,
+        data.objects.countries,
+        (a, b) => {
+          const idA = parseInt(a.id, 10);
+          const idB = parseInt(b.id, 10);
+          return a !== b && idA !== 10 && idB !== 10;
         }
       );
     } catch (e) {
@@ -89,6 +211,7 @@ export class MapRenderer {
 
       this.app.geoPath = d3.geoPath(this.app.projection, this.app.ctx);
       this.generateHitMask(width, height);
+      this.clampPan();
     }
   }
 
@@ -106,6 +229,8 @@ export class MapRenderer {
     offCtx.clearRect(0, 0, this.app.maskW, this.app.maskH);
 
     for (let i = 0; i < this.app.countryFeatures.length; i++) {
+      const feature = this.app.countryFeatures[i];
+      if (feature.isSmallCountry) continue;
       const countryIdx = i + 1;
       const r = (countryIdx >> 16) & 255;
       const g = (countryIdx >> 8) & 255;
@@ -113,7 +238,7 @@ export class MapRenderer {
 
       offCtx.fillStyle = `rgb(${r},${g},${b})`;
       offCtx.beginPath();
-      maskPath(this.app.countryFeatures[i]);
+      maskPath(feature);
       offCtx.fill();
     }
 
@@ -125,9 +250,64 @@ export class MapRenderer {
     ).data;
   }
 
+  /**
+   * Traces a small country's projected polygon ring directly onto the canvas
+   * without spherical clipping/inversion artifacts.
+   */
+  traceSmallCountryPath(ctx, sf) {
+    if (!sf || !sf.ring || !this.app.projection) return false;
+    ctx.beginPath();
+    for (let i = 0; i < sf.ring.length; i++) {
+      const pt = this.app.projection(sf.ring[i]);
+      if (!pt) continue;
+      if (i === 0) ctx.moveTo(pt[0], pt[1]);
+      else ctx.lineTo(pt[0], pt[1]);
+    }
+    ctx.closePath();
+    return true;
+  }
+
   detectCountryAtPoint(mouseX, mouseY) {
-    const px = Math.floor(mouseX);
-    const py = Math.floor(mouseY);
+    const [baseX, baseY] = this.screenToBase(mouseX, mouseY);
+
+    // When zoomed in, check smaller countries & microstates first so enclaves
+    // (e.g. Monaco, San Marino, Vatican City, Singapore, Bahrain, Malta) are pickable
+    if (
+      this.zoomScale >= (CONFIG.smallCountryZoomThreshold || 1.45) &&
+      this.app.smallCountryFeatures &&
+      this.app.smallCountryFeatures.length > 0 &&
+      this.app.projection
+    ) {
+      const coords = this.app.projection.invert([baseX, baseY]);
+      for (const sf of this.app.smallCountryFeatures) {
+        if (
+          Number.isFinite(sf.centerLon) &&
+          Number.isFinite(sf.centerLat)
+        ) {
+          const screenPt = this.projectToScreen([sf.centerLon, sf.centerLat]);
+          if (
+            screenPt &&
+            Math.hypot(mouseX - screenPt[0], mouseY - screenPt[1]) <= 8
+          ) {
+            return sf._countryIdx;
+          }
+        }
+        if (
+          coords &&
+          sf.rx &&
+          sf.ry &&
+          Math.hypot(
+            (coords[0] - sf.centerLon) / sf.rx,
+            (coords[1] - sf.centerLat) / sf.ry
+          ) <= 1.15
+        ) {
+          return sf._countryIdx;
+        }
+      }
+    }
+
+    const px = Math.floor(baseX);
+    const py = Math.floor(baseY);
     if (
       this.app.maskData &&
       px >= 0 &&
@@ -288,7 +468,7 @@ export class MapRenderer {
     if (locations.length === 0) {
       this.app.pinnedNodesList.innerHTML = `
         <div class="pinned-nodes-empty">
-          No nodes pinned. <a href="settings.html#locations">Add in Settings →</a>
+          No nodes pinned. <a href="locations.html">Add in Map Locations →</a>
         </div>
       `;
       this.lastAlarmSignature = "";
@@ -407,7 +587,7 @@ export class MapRenderer {
       const lat = parseFloat(loc.lat);
       if (Number.isNaN(lon) || Number.isNaN(lat)) continue;
 
-      const pt = this.app.projection([lon, lat]);
+      const pt = this.projectToScreen([lon, lat]);
       if (!pt) continue;
 
       const [x, y] = pt;
@@ -577,8 +757,8 @@ export class MapRenderer {
   renderSelectedAttack() {
     if (!this.app.selectedAttack || !this.app.projection) return;
     const data = this.app.selectedAttack;
-    const srcScreen = this.app.projection([data.srcLon, data.srcLat]);
-    const dstScreen = this.app.projection([data.dstLon, data.dstLat]);
+    const srcScreen = this.projectToScreen([data.srcLon, data.srcLat]);
+    const dstScreen = this.projectToScreen([data.dstLon, data.dstLat]);
     if (!srcScreen || !dstScreen) return;
 
     const start = { x: srcScreen[0], y: srcScreen[1] };
@@ -615,9 +795,9 @@ export class MapRenderer {
     ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
     ctx.stroke();
 
-    const t = (performance.now() * 0.00045) % 1;
+    const t = (performance.now() * 0.000225) % 1;
     const pulsePt = getBezierPoint(t, start, control, end);
-    ctx.shadowColor = "#00F0FF";
+    ctx.shadowColor = color;
     ctx.shadowBlur = 16;
     ctx.fillStyle = "#ffffff";
     ctx.globalAlpha = 1.0;
@@ -626,7 +806,7 @@ export class MapRenderer {
     ctx.fill();
 
     const pulseRadius = 8 + Math.sin(performance.now() * 0.006) * 3;
-    ctx.strokeStyle = "#00F0FF";
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.arc(start.x, start.y, pulseRadius, 0, Math.PI * 2);
@@ -641,15 +821,24 @@ export class MapRenderer {
       data.srcCity && data.srcCity !== "Unknown"
         ? data.srcCity
         : data.srcCountry;
-    const targetName = data.dstCity ? data.dstCity : data.dstCountry;
+    const targetName =
+      data.dstCity && data.dstCity !== "Unknown"
+        ? data.dstCity
+        : data.dstCountry;
     this.drawCityBadge(
       start.x,
       start.y,
-      `${originName} (${data.srcCode.toUpperCase()})`,
-      "#00F0FF",
-      "#006FFF"
+      `SOURCE: ${originName} (${data.srcCode.toUpperCase()})`,
+      color,
+      color
     );
-    this.drawCityBadge(end.x, end.y, `TARGET: ${targetName}`, color, color);
+    this.drawCityBadge(
+      end.x,
+      end.y,
+      `TARGET: ${targetName} (${data.dstCode.toUpperCase()})`,
+      color,
+      color
+    );
 
     ctx.restore();
   }
@@ -673,12 +862,14 @@ export class MapRenderer {
 
       if (rip.data && !this.app.matchesActiveFilters(rip.data)) continue;
 
+      const [rx, ry] = this.baseToScreen(rip.x, rip.y);
+
       ctx.save();
       ctx.strokeStyle = rip.color;
       ctx.globalAlpha = Math.max(0, rip.opacity * dimFactor);
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.arc(rip.x, rip.y, rip.radius, 0, Math.PI * 2);
+      ctx.arc(rx, ry, rip.radius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -698,6 +889,17 @@ export class MapRenderer {
 
       if (!this.app.matchesActiveFilters(atk.data)) continue;
 
+      const [sx, sy] = this.baseToScreen(atk.start.x, atk.start.y);
+      const [ex, ey] = this.baseToScreen(atk.end.x, atk.end.y);
+      const start = { x: sx, y: sy };
+      const end = { x: ex, y: ey };
+      const dist = Math.hypot(end.x - start.x, end.y - start.y);
+      const archAltitude = Math.min(180, Math.max(35, dist * 0.28));
+      const control = {
+        x: (start.x + end.x) / 2,
+        y: (start.y + end.y) / 2 - archAltitude,
+      };
+
       ctx.save();
 
       ctx.fillStyle = atk.color;
@@ -705,19 +907,35 @@ export class MapRenderer {
       ctx.shadowBlur = 10;
       ctx.globalAlpha = dimFactor;
       ctx.beginPath();
-      ctx.arc(atk.start.x, atk.start.y, 3.2, 0, Math.PI * 2);
+      ctx.arc(start.x, start.y, 3.2, 0, Math.PI * 2);
+      ctx.arc(end.x, end.y, 3.0, 0, Math.PI * 2);
       ctx.fill();
 
       if (!this.app.selectedAttack) {
-        this.drawCityBadge(atk.start.x, atk.start.y, atk.cityName);
+        this.drawCityBadge(
+          start.x,
+          start.y,
+          `SOURCE: ${atk.cityName}`,
+          atk.color,
+          atk.color
+        );
+        if (atk.targetCityName) {
+          this.drawCityBadge(
+            end.x,
+            end.y,
+            `TARGET: ${atk.targetCityName}`,
+            atk.color,
+            atk.color
+          );
+        }
       }
 
       ctx.strokeStyle = atk.color;
       ctx.globalAlpha = 0.38 * dimFactor;
       ctx.lineWidth = 1.3;
       ctx.beginPath();
-      ctx.moveTo(atk.start.x, atk.start.y);
-      ctx.quadraticCurveTo(atk.control.x, atk.control.y, atk.end.x, atk.end.y);
+      ctx.moveTo(start.x, start.y);
+      ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
       ctx.stroke();
 
       const tailT = Math.max(0, atk.progress - atk.trailLength);
@@ -728,8 +946,8 @@ export class MapRenderer {
         const t1 = tailT + (s / segments) * (headT - tailT);
         const t2 = tailT + ((s + 1) / segments) * (headT - tailT);
 
-        const pt1 = getBezierPoint(t1, atk.start, atk.control, atk.end);
-        const pt2 = getBezierPoint(t2, atk.start, atk.control, atk.end);
+        const pt1 = getBezierPoint(t1, start, control, end);
+        const pt2 = getBezierPoint(t2, start, control, end);
         const segAlpha = (s + 1) / segments;
 
         ctx.strokeStyle = atk.color;
@@ -741,7 +959,7 @@ export class MapRenderer {
         ctx.stroke();
       }
 
-      const headPt = getBezierPoint(headT, atk.start, atk.control, atk.end);
+      const headPt = getBezierPoint(headT, start, control, end);
       ctx.shadowColor = atk.color;
       ctx.shadowBlur = 14;
       ctx.fillStyle = "#FFFFFF";
@@ -769,6 +987,12 @@ export class MapRenderer {
 
     this.drawCyberOceanBackdrop(width, height);
 
+    // Apply zoom & pan transform ONLY to the geographic map layers;
+    // stroke widths are divided by zoomScale so coastlines stay crisp at 1:1 scale
+    ctx.save();
+    ctx.translate(this.panX, this.panY);
+    ctx.scale(this.zoomScale, this.zoomScale);
+
     if (this.app.mergedLandGeo) {
       ctx.save();
       ctx.fillStyle = CONFIG.landFill;
@@ -778,10 +1002,23 @@ export class MapRenderer {
       ctx.restore();
     }
 
+    // Optional: All interior borders between countries (when toggled ON)
+    if (this.app.showCountryBorders && this.app.bordersMesh) {
+      ctx.save();
+      ctx.strokeStyle = CONFIG.countryBorderStroke;
+      ctx.lineWidth = (CONFIG.countryBorderWidth || 1.0) / this.zoomScale;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      this.app.geoPath(this.app.bordersMesh);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (this.app.coastlineMesh) {
       ctx.save();
       ctx.strokeStyle = CONFIG.coastlineStroke;
-      ctx.lineWidth = CONFIG.coastlineWidth;
+      ctx.lineWidth = CONFIG.coastlineWidth / this.zoomScale;
       ctx.shadowColor = CONFIG.coastlineGlow;
       ctx.shadowBlur = 8;
       ctx.lineCap = "round";
@@ -792,23 +1029,53 @@ export class MapRenderer {
       ctx.restore();
     }
 
+    // Progressive Detail: Reveal smaller countries & microstates when zoomed in
+    if (
+      this.zoomScale >= (CONFIG.smallCountryZoomThreshold || 1.45) &&
+      this.app.smallCountryFeatures &&
+      this.app.smallCountryFeatures.length > 0
+    ) {
+      ctx.save();
+      ctx.fillStyle = CONFIG.landFill;
+      ctx.strokeStyle = CONFIG.coastlineStroke;
+      ctx.lineWidth = 0.95 / this.zoomScale;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      for (const sf of this.app.smallCountryFeatures) {
+        if (this.traceSmallCountryPath(ctx, sf)) {
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
     if (
       this.app.hoveredCountryIndex !== null &&
       this.app.hoveredCountryIndex !== this.app.selectedCountryIndex
     ) {
       const feature = this.app.countryFeatures[this.app.hoveredCountryIndex - 1];
-      if (feature) {
+      if (
+        feature &&
+        (!feature.isSmallCountry ||
+          this.zoomScale >= (CONFIG.smallCountryZoomThreshold || 1.45))
+      ) {
         ctx.save();
         ctx.fillStyle = CONFIG.hoverFill;
         ctx.strokeStyle = CONFIG.hoverStroke;
-        ctx.lineWidth = CONFIG.hoverStrokeWidth;
+        ctx.lineWidth = CONFIG.hoverStrokeWidth / this.zoomScale;
         ctx.shadowColor = CONFIG.hoverFill;
         ctx.shadowBlur = CONFIG.hoverGlowBlur;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
-        ctx.beginPath();
-        this.app.geoPath(feature);
+        if (feature.isSmallCountry) {
+          this.traceSmallCountryPath(ctx, feature);
+        } else {
+          ctx.beginPath();
+          this.app.geoPath(feature);
+        }
         ctx.fill();
         ctx.stroke();
         ctx.restore();
@@ -822,21 +1089,27 @@ export class MapRenderer {
         ctx.save();
         ctx.fillStyle = CONFIG.selectedCountryFill;
         ctx.strokeStyle = CONFIG.selectedCountryStroke;
-        ctx.lineWidth = CONFIG.selectedCountryStrokeWidth;
+        ctx.lineWidth = CONFIG.selectedCountryStrokeWidth / this.zoomScale;
         ctx.shadowColor = CONFIG.selectedCountryStroke;
         ctx.shadowBlur = CONFIG.selectedCountryGlowBlur;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
-        ctx.beginPath();
-        this.app.geoPath(selFeature);
+        if (selFeature.isSmallCountry) {
+          this.traceSmallCountryPath(ctx, selFeature);
+        } else {
+          ctx.beginPath();
+          this.app.geoPath(selFeature);
+        }
         ctx.fill();
         ctx.stroke();
         ctx.restore();
       }
     }
 
-    // Render pinned custom locations (City Icon + Name underneath)
+    ctx.restore();
+
+    // Render pinned custom locations & attack trajectories in 1:1 screen space
     this.renderCustomLocations();
 
     this.renderAttacks();
@@ -854,8 +1127,103 @@ export class MapRenderer {
       }
     });
 
+    // Mouse Wheel Zoom (centered at cursor)
+    this.app.canvas.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const rect = this.app.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const factor = e.deltaY < 0 ? 1.22 : 1 / 1.22;
+        this.zoomAtPoint(this.zoomScale * factor, mouseX, mouseY);
+      },
+      { passive: false }
+    );
+
+    // Click-and-Drag Panning on the Map
+    this.app.canvas.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      this.isPanning = true;
+      this.didDrag = false;
+      this.panStartX = e.clientX;
+      this.panStartY = e.clientY;
+      this.panOriginX = this.panX;
+      this.panOriginY = this.panY;
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (this.isPanning) {
+        this.isPanning = false;
+        this.app.canvas.classList.remove("is-panning");
+      }
+    });
+
+    // Zoom Control HUD Buttons (+ / - / Reset)
+    if (this.app.btnZoomIn) {
+      this.app.btnZoomIn.addEventListener("click", () => {
+        this.zoomAtPoint(
+          this.zoomScale * 1.35,
+          window.innerWidth / 2,
+          window.innerHeight / 2
+        );
+      });
+    }
+    if (this.app.btnZoomOut) {
+      this.app.btnZoomOut.addEventListener("click", () => {
+        this.zoomAtPoint(
+          this.zoomScale / 1.35,
+          window.innerWidth / 2,
+          window.innerHeight / 2
+        );
+      });
+    }
+    if (this.app.btnZoomReset) {
+      this.app.btnZoomReset.addEventListener("click", () => {
+        this.resetZoom();
+      });
+    }
+
+    // Country Borders Always-On Toggle Button
+    if (this.app.btnToggleBorders) {
+      this.app.btnToggleBorders.classList.toggle(
+        "active",
+        Boolean(this.app.showCountryBorders)
+      );
+      this.app.btnToggleBorders.addEventListener("click", () => {
+        this.app.showCountryBorders = !this.app.showCountryBorders;
+        localStorage.setItem(
+          "soc_show_borders",
+          String(this.app.showCountryBorders)
+        );
+        this.app.btnToggleBorders.classList.toggle(
+          "active",
+          this.app.showCountryBorders
+        );
+      });
+    }
+
+    // Click a pinned node row in the legend to center and zoom onto that node
+    if (this.app.pinnedNodesList) {
+      this.app.pinnedNodesList.addEventListener("click", (e) => {
+        const row = e.target.closest(".pinned-node-row");
+        if (!row || !this.app.customLocations) return;
+        const key = row.dataset.nodeKey;
+        const loc = this.app.customLocations.find(
+          (l, idx) => (l.id || l.name || `node_${idx}`) === key
+        );
+        if (loc) {
+          this.focusLocation(loc, Math.max(this.zoomScale, 4.0));
+        }
+      });
+    }
+
     // Click on Map Country to toggle Gold highlight & open/close Gold Dossier Card
     this.app.canvas.addEventListener("click", (e) => {
+      if (this.didDrag) {
+        this.didDrag = false;
+        return;
+      }
       const rect = this.app.canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -878,8 +1246,24 @@ export class MapRenderer {
       this.lastMouseX = mouseX;
       this.lastMouseY = mouseY;
 
+      if (this.isPanning) {
+        const dx = e.clientX - this.panStartX;
+        const dy = e.clientY - this.panStartY;
+        if (Math.hypot(dx, dy) > 4) {
+          this.didDrag = true;
+          this.app.canvas.classList.add("is-panning");
+        }
+        if (this.zoomScale > 1.0) {
+          this.panX = this.panOriginX + dx;
+          this.panY = this.panOriginY + dy;
+          this.clampPan();
+        }
+        return;
+      }
+
       if (this.app.projection) {
-        const coords = this.app.projection.invert([mouseX, mouseY]);
+        const [baseX, baseY] = this.screenToBase(mouseX, mouseY);
+        const coords = this.app.projection.invert([baseX, baseY]);
         if (
           coords &&
           coords[0] >= -180 &&

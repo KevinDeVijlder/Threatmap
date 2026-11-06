@@ -51,7 +51,7 @@ export class DossierController {
       this.app.cursorTooltip.style.display = "flex";
 
       this.app.countryNameEl.textContent = meta.name.toUpperCase();
-      this.app.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} // ID: ${meta.idLabel}`;
+      this.app.countryCodeEl.textContent = `ISO: ${meta.code.toUpperCase()} | ID: ${meta.idLabel}`;
       this.app.countryFlagEl.src = flagUrl;
       this.app.countryFlagEl.onload = () => {
         this.app.countryFlagEl.style.display = "block";
@@ -147,7 +147,7 @@ export class DossierController {
       ? "AS_TRANSIT"
       : "N/A";
 
-    this.app.dossierHeaderTag.textContent = `SECTOR INTELLIGENCE // ${code.toUpperCase()}`;
+    this.app.dossierHeaderTag.textContent = `SECTOR INTELLIGENCE | ${code.toUpperCase()}`;
     if (meta.code) {
       this.app.dossierFlag.src = `https://flagcdn.com/w80/${code}.png`;
       this.app.dossierFlag.style.display = "block";
@@ -155,7 +155,7 @@ export class DossierController {
       this.app.dossierFlag.style.display = "none";
     }
     this.app.dossierCountryName.textContent = meta.name.toUpperCase();
-    this.app.dossierIsoSub.textContent = `ISO: ${code.toUpperCase()} // TRAFFIC SHARE: ${globalShare}%`;
+    this.app.dossierIsoSub.textContent = `ISO: ${code.toUpperCase()} | TRAFFIC SHARE: ${globalShare}%`;
     this.app.dossierThreatBadge.textContent = threatLevel;
 
     this.app.dossierOutboundVal.textContent = outHits.toLocaleString();
@@ -216,11 +216,11 @@ export class DossierController {
     const mitreClean = (d.mitre || "T1071").trim();
     const ipClean = d.srcIp && d.srcIp !== "N/A" ? d.srcIp.trim() : "";
 
-    this.app.atkDossierHeaderTag.textContent = `INTRUSION TELEMETRY // ID #${d._id.toUpperCase()}`;
+    this.app.atkDossierHeaderTag.textContent = `INTRUSION TELEMETRY | ID #${d._id.toUpperCase()}`;
     this.app.atkDossierMalware.textContent = d.malware || "UNKNOWN_THREAT";
     this.app.atkDossierCategory.textContent = `${
       d.category || "C2_EVENT"
-    } // ${(d.feedMode || "LIVE").toUpperCase()} FEED`;
+    } | ${(d.feedMode || "LIVE").toUpperCase()} FEED`;
     this.app.atkDossierSevBadge.textContent = `${bucket} (${(
       d.severity || bucket
     ).toUpperCase()})`;
@@ -240,8 +240,8 @@ export class DossierController {
 
     const dstIpClean = d.dstIp && d.dstIp !== "N/A" ? d.dstIp.trim() : "";
     this.app.atkDossierDstPort.textContent = dstIpClean
-      ? `IP: ${dstIpClean} // PORT: ${d.port || 443}/${d.proto || "TCP"}`
-      : `PORT: ${d.port || 443} / ${d.proto || "TCP"}`;
+      ? `IP: ${dstIpClean} | PORT: ${d.port || 443}/${d.proto || "TCP"}`
+      : `PORT: ${d.port || 443} | ${d.proto || "TCP"}`;
     this.app.atkDossierDstFlag.src = `https://flagcdn.com/w40/${dstCode}.png`;
     this.app.atkDossierDstLoc.textContent = `${dstCity}, ${
       d.dstCountry

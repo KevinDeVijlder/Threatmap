@@ -6,21 +6,10 @@
 
 <!-- Top Telemetry Header -->
 <header class="hud-header">
-  <div class="hud-mode-switcher">
-    <button id="btn-mode-live" class="mode-btn active" type="button">
+  <div class="hud-stream-status-box">
+    <div class="stream-status-pill">
       <span id="conn-status" class="mode-dot"></span>
-      <span>LIVE INTEL FEED</span>
-    </button>
-
-    <div id="custom-mode-wrapper" class="custom-mode-wrapper locked">
-      <button id="btn-mode-custom" class="mode-btn inactive locked" type="button" disabled>
-        <span class="mode-dot custom-dot"></span>
-        <span>CUSTOM INTEL FEED</span>
-      </button>
-      <div id="custom-feed-tooltip" class="custom-feed-tooltip">
-        <i class="fa-solid fa-lock"></i>
-        <span>REGISTER OR LOGIN TO USE CUSTOM FEEDS</span>
-      </div>
+      <span id="feed-stream-status">ACTIVE THREAT STREAM</span>
     </div>
   </div>
 
@@ -41,26 +30,36 @@
     </div>
 
     <div class="user-profile-wrapper">
-      <button id="btn-user-profile" class="user-btn logged-out" type="button" aria-label="User Account">
+      <!-- Hover-only operator avatar (non-clickable) -->
+      <div id="btn-user-profile" class="user-btn logged-out" aria-label="User Account">
         <img id="user-avatar-img" class="user-avatar-img" src="" alt="Avatar" style="display: none;" />
         <i id="user-default-icon" class="fa-solid fa-user-astronaut user-fa-icon"></i>
         <span id="user-auth-dot" class="user-auth-dot"></span>
-      </button>
+      </div>
 
       <div class="user-dropdown-bridge">
         <div class="user-dropdown-menu">
           <div class="user-dropdown-header">
             <span id="dropdown-user-status" class="dropdown-status-label">UNAUTHENTICATED SESSION</span>
+            <a id="dropdown-login-link" href="login.html" class="dropdown-login-pill">LOGIN</a>
           </div>
-          <button id="menu-btn-account" class="user-menu-btn" type="button">
-            <i id="menu-icon-account" class="fa-solid fa-user-plus"></i>
-            <span id="menu-text-account">REGISTER / LOGIN</span>
+          <button id="menu-btn-operator" class="user-menu-btn" type="button">
+            <i class="fa-solid fa-user-gear"></i>
+            <span>OPERATOR SETTINGS</span>
           </button>
-          <button id="menu-btn-feeds" class="user-menu-btn disabled" type="button">
-            <i class="fa-solid fa-city"></i>
-            <span>FEEDS &amp; MAP LOCATIONS</span>
+          <button id="menu-btn-locations" class="user-menu-btn" type="button">
+            <i class="fa-solid fa-map-location-dot"></i>
+            <span>MAP LOCATIONS</span>
           </button>
-          <button id="menu-btn-logout" class="user-menu-btn disabled" type="button">
+          <button id="menu-btn-feeds" class="user-menu-btn" type="button">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <span>CUSTOM FEED OPTIONS</span>
+          </button>
+          <button id="menu-btn-github" class="user-menu-btn" type="button">
+            <i class="fa-brands fa-github"></i>
+            <span>GO TO GITHUB PROJECT</span>
+          </button>
+          <button id="menu-btn-logout" class="user-menu-btn danger-item disabled" type="button">
             <i class="fa-solid fa-right-from-bracket"></i>
             <span>LOGOUT</span>
           </button>

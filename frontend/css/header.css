@@ -52,111 +52,44 @@
   pointer-events: none;
 }
 
-.hud-mode-switcher {
+.hud-stream-status-box {
   width: 320px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
   pointer-events: auto;
 }
 
-.custom-mode-wrapper {
-  position: relative;
-  display: flex;
-}
-
-.mode-btn {
+.stream-status-pill {
   width: 100%;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  background: var(--color-hud-bg);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.4);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  font-weight: 700;
-  padding: 0 8px;
-  border-radius: 6px;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  backdrop-filter: blur(16px);
-  box-shadow: var(--glass-shadow);
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.mode-btn.inactive {
-  background: rgba(4, 11, 24, 0.55);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.3);
-  box-shadow: none;
-}
-
-.mode-btn:not(.locked):hover {
-  border-color: rgba(0, 111, 255, 0.6);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.mode-btn.active {
-  background: linear-gradient(180deg, rgba(0, 111, 255, 0.26) 0%, rgba(0, 111, 255, 0.10) 100%);
+  gap: 9px;
+  background: linear-gradient(180deg, rgba(0, 111, 255, 0.22) 0%, rgba(0, 111, 255, 0.08) 100%);
   border: 1px solid var(--color-primary);
   border-bottom: 2px solid var(--color-accent);
   color: #ffffff;
-  box-shadow: 0 0 20px rgba(0, 111, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0 12px;
+  border-radius: 6px;
+  letter-spacing: 0.08em;
+  cursor: default;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 0 20px rgba(0, 111, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   text-shadow: 0 0 8px var(--color-primary-glow);
-}
-
-.mode-btn.locked {
-  cursor: not-allowed;
-  opacity: 0.5;
+  white-space: nowrap;
 }
 
 .mode-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.22);
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-}
-
-.mode-btn.active .mode-dot {
   background-color: var(--color-primary);
   box-shadow: 0 0 10px var(--color-primary);
+  flex-shrink: 0;
   animation: pulse 2s infinite ease-in-out;
-}
-
-.custom-feed-tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  background: rgba(5, 13, 28, 0.96);
-  border: 1px solid var(--color-primary);
-  border-left: 3px solid var(--color-high);
-  padding: 7px 11px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.56rem;
-  font-weight: 700;
-  color: var(--color-primary);
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
-  z-index: 100;
-}
-
-.custom-feed-tooltip i { color: var(--color-high); }
-.custom-mode-wrapper.locked:hover .custom-feed-tooltip {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .hud-right-group {
@@ -194,7 +127,7 @@
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
 
-/* User Profile Button & Dropdown */
+/* User Profile Hover-Only Avatar & Dropdown */
 .user-profile-wrapper {
   position: relative;
   display: flex;
@@ -212,7 +145,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: default;
+  user-select: none;
   backdrop-filter: blur(16px);
   box-shadow: var(--glass-shadow);
   transition: all 0.2s ease;
@@ -263,7 +197,7 @@
 }
 
 .user-dropdown-menu {
-  width: 235px;
+  width: 248px;
   background: rgba(5, 13, 28, 0.96);
   border: 1px solid var(--color-primary);
   border-top: 2px solid var(--color-primary);
@@ -277,11 +211,38 @@
 }
 
 .user-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
   padding: 4px 8px 6px;
   border-bottom: 1px solid rgba(0, 111, 255, 0.2);
   margin-bottom: 2px;
 }
-.dropdown-status-label { font-size: 0.52rem; font-weight: 700; color: rgba(255, 255, 255, 0.45); letter-spacing: 0.08em; }
+.dropdown-status-label {
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.07em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropdown-login-pill {
+  font-size: 0.48rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--color-primary);
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.dropdown-login-pill:hover {
+  background: var(--color-accent);
+}
 
 .user-menu-btn {
   width: 100%;
@@ -292,7 +253,7 @@
   border: 1px solid rgba(0, 111, 255, 0.2);
   color: var(--color-primary);
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 700;
   padding: 9px 11px;
   border-radius: 5px;
@@ -301,12 +262,29 @@
   text-align: left;
   transition: all 0.16s ease;
 }
-.user-menu-btn i { width: 16px; text-align: center; font-size: 0.75rem; color: var(--color-primary); transition: transform 0.16s ease; }
+.user-menu-btn i { width: 16px; text-align: center; font-size: 0.78rem; color: var(--color-primary); transition: transform 0.16s ease; }
 .user-menu-btn:not(.disabled):hover {
   background: rgba(0, 111, 255, 0.22);
   border-color: var(--color-primary);
+  color: #ffffff;
   box-shadow: 0 0 12px rgba(0, 111, 255, 0.32);
   text-shadow: 0 0 8px var(--color-primary-glow);
 }
-.user-menu-btn:not(.disabled):hover i { transform: scale(1.1); }
+.user-menu-btn:not(.disabled):hover i { transform: scale(1.1); color: #ffffff; }
+.user-menu-btn.danger-item:not(.disabled) {
+  border-color: rgba(255, 94, 54, 0.35);
+  color: var(--color-high);
+}
+.user-menu-btn.danger-item:not(.disabled) i {
+  color: var(--color-high);
+}
+.user-menu-btn.danger-item:not(.disabled):hover {
+  background: rgba(255, 94, 54, 0.2);
+  border-color: var(--color-high);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 94, 54, 0.32);
+}
+.user-menu-btn.danger-item:not(.disabled):hover i {
+  color: #ffffff;
+}
 .user-menu-btn.disabled { opacity: 0.35; cursor: not-allowed; border-color: rgba(255, 255, 255, 0.06); background: rgba(255, 255, 255, 0.02); }

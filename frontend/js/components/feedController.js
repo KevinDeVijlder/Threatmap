@@ -111,14 +111,7 @@ export class FeedController {
     } else {
       this.app.pauseIcon.className = "fa-solid fa-pause";
       this.app.pauseLabel.textContent = "PAUSE";
-      this.app.feedModeLabel.textContent =
-        this.app.activeFeedMode === "live"
-          ? "LIVE OSINT STREAM"
-          : `CUSTOM // ${
-              this.app.currentUser
-                ? this.app.currentUser.username.toUpperCase()
-                : "FEED"
-            }`;
+      this.app.authController.updateStreamLabels();
     }
   }
 

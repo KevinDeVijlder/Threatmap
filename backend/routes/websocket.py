@@ -21,10 +21,9 @@ async def websocket_endpoint(websocket: WebSocket):
             raw_msg = await websocket.receive_text()
             try:
                 msg = json.loads(raw_msg)
-                if msg.get("action") == "set_mode":
-                    manager.set_client_mode(
+                if msg.get("action") in ("auth", "set_mode"):
+                    manager.set_client_auth(
                         websocket,
-                        mode=msg.get("mode", "live"),
                         token=msg.get("token"),
                     )
             except Exception:

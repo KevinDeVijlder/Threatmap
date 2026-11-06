@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator Settings | SOC Threat Matrix</title>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/x-icon" href="../favicon.png">
+</head>
+<body class="subpage-body" data-page="operator">
+  <!-- Top Tactical Cross-Page Navigation Bar -->
+  <header class="subpage-header">
+    <a href="index.html" class="subpage-brand">
+      <div class="subpage-brand-icon">
+        <i class="fa-solid fa-user-gear"></i>
+      </div>
+      <div class="subpage-brand-text">
+        <span class="subpage-brand-title">SOC THREAT MATRIX</span>
+        <span class="subpage-brand-sub">OPERATOR SETTINGS &amp; TERMINAL PREFERENCES</span>
+      </div>
+    </a>
+
+    <nav class="subpage-nav-actions">
+      <a href="operator.html" class="nav-action-btn active">
+        <i class="fa-solid fa-user-gear"></i>
+        <span>OPERATOR SETTINGS</span>
+      </a>
+      <a href="locations.html" class="nav-action-btn">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>MAP LOCATIONS</span>
+      </a>
+      <a href="feeds.html" class="nav-action-btn">
+        <i class="fa-solid fa-satellite-dish"></i>
+        <span>CUSTOM FEED OPTIONS</span>
+      </a>
+      <a href="https://github.com/KevinDeVijlder/Threatmap" target="_blank" rel="noopener noreferrer" class="nav-action-btn">
+        <i class="fa-brands fa-github"></i>
+        <span>GITHUB</span>
+      </a>
+      <a href="index.html" class="nav-action-btn primary-nav">
+        <i class="fa-solid fa-earth-americas"></i>
+        <span>THREAT MAP</span>
+      </a>
+      <button id="btn-settings-logout" class="nav-action-btn danger" type="button">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>LOGOUT</span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="settings-page-container">
+    <!-- Top Operator Identity & Telemetry Summary Banner -->
+    <section class="operator-banner-card">
+      <div class="operator-banner-left">
+        <div class="avatar-preview-box large">
+          <img id="profile-avatar-preview" src="" alt="Operator Avatar" style="display: none;" />
+          <span id="profile-avatar-placeholder"><i class="fa-solid fa-user-astronaut"></i></span>
+        </div>
+        <div class="profile-meta">
+          <span class="profile-callsign" id="profile-username-display">OPERATOR</span>
+          <span class="profile-status-tag">AUTHENTICATED SOC OPERATOR</span>
+        </div>
+      </div>
+
+      <div class="operator-banner-stats">
+        <div class="op-stat-pill">
+          <span class="stat-lbl">MONITORED LOCATIONS</span>
+          <span class="stat-val" id="stat-locations-count">0 NODES</span>
+        </div>
+        <div class="op-stat-pill">
+          <span class="stat-lbl">ACTIVE INTEL FEEDS</span>
+          <span class="stat-val" id="stat-feeds-count">4 ACTIVE</span>
+        </div>
+        <div class="op-stat-pill">
+          <span class="stat-lbl">SESSION HITS LOGGED</span>
+          <span class="stat-val" id="stat-local-hits">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operator Settings Two-Column Grid -->
+    <div class="settings-grid">
+      <!-- Column 1: Profile Avatar & Passkey Security -->
+      <section class="settings-card accent-card">
+        <div class="settings-card-header">
+          <div class="settings-card-title-group">
+            <span class="settings-card-title">
+              <i class="fa-solid fa-id-badge"></i>
+              <span>OPERATOR IDENTITY &amp; SECURITY PASSKEY</span>
+            </span>
+            <span class="settings-card-desc">
+              Customize your SOC operator profile avatar displayed in the Threat Map HUD and update your authentication passkey.
+            </span>
+          </div>
+        </div>
+
+        <div class="config-form">
+          <div class="config-field">
+            <label>OPERATOR PROFILE AVATAR</label>
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 4px;">
+              <label class="file-upload-btn">
+                <i class="fa-solid fa-camera"></i> UPLOAD NEW AVATAR
+                <input id="profile-avatar-input" type="file" accept="image/*" hidden />
+              </label>
+              <button id="btn-remove-avatar" class="file-upload-btn" type="button" style="border-color: rgba(255, 255, 255, 0.25); color: rgba(255, 255, 255, 0.75); background: rgba(255, 255, 255, 0.05);">
+                <i class="fa-solid fa-user-astronaut"></i> RESET TO DEFAULT ICON
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <form id="password-form" class="config-form">
+          <div class="config-field">
+            <label for="current-password-input">CURRENT SECURITY PASSKEY *</label>
+            <input id="current-password-input" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <div class="config-field">
+            <label for="new-password-input">NEW SECURITY PASSKEY (MIN 4 CHARS) *</label>
+            <input id="new-password-input" type="password" placeholder="••••••••" required autocomplete="new-password" />
+          </div>
+          <div style="display: flex; justify-content: flex-end;">
+            <button class="btn-submit-config" type="submit">
+              <i class="fa-solid fa-key"></i> UPDATE SECURITY PASSKEY
+            </button>
+          </div>
+        </form>
+
+        <div id="operator-status-toast" class="status-toast"></div>
+      </section>
+
+      <!-- Column 2: Map Display Preferences & Telemetry Controls -->
+      <section class="settings-card">
+        <div class="settings-card-header">
+          <div class="settings-card-title-group">
+            <span class="settings-card-title">
+              <i class="fa-solid fa-sliders"></i>
+              <span>MAP DISPLAY &amp; TELEMETRY CONTROLS</span>
+            </span>
+            <span class="settings-card-desc">
+              Configure local browser cartography preferences, reset captured session telemetry counters, or jump to your Map Locations and Feed Options.
+            </span>
+          </div>
+        </div>
+
+        <div class="config-form">
+          <div class="config-checkbox-row" style="padding: 4px 0;">
+            <label class="checkbox-label">
+              <input id="pref-borders-checkbox" type="checkbox" />
+              <span>Always display white interior country borders on Threat Map startup</span>
+            </label>
+          </div>
+
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <span style="font-size: 0.6rem; font-weight: 700; color: #ffffff;">LOCAL TELEMETRY COUNTERS</span>
+              <span style="font-size: 0.52rem; color: rgba(255, 255, 255, 0.5);">Clears local attack hit totals and Top 10 origin/target leaderboards.</span>
+            </div>
+            <button id="btn-reset-local-stats" class="file-upload-btn" type="button">
+              <i class="fa-solid fa-rotate-left"></i> RESET LOCAL STATS
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Navigation Cards to Other Configuration Pages -->
+        <div class="config-form" style="gap: 10px;">
+          <span style="font-size: 0.52rem; font-weight: 700; color: rgba(255, 255, 255, 0.55); letter-spacing: 0.08em;">QUICK CONFIGURATION NAVIGATION</span>
+          <a href="locations.html" class="location-item-card" style="text-decoration: none; border-left-color: #A855F7;">
+            <div class="location-item-left">
+              <div class="location-city-icon" style="color: #A855F7; border-color: #A855F7; background: rgba(168, 85, 247, 0.14);">
+                <i class="fa-solid fa-map-location-dot"></i>
+              </div>
+              <div class="location-item-details">
+                <span class="location-item-name">MAP LOCATIONS &amp; PINNED NODES</span>
+                <span class="location-item-sub">Pin custom IP addresses and geolocations with category icons onto the map →</span>
+              </div>
+            </div>
+          </a>
+
+          <a href="feeds.html" class="location-item-card" style="text-decoration: none; border-left-color: var(--color-primary);">
+            <div class="location-item-left">
+              <div class="location-city-icon" style="color: var(--color-primary); border-color: var(--color-primary); background: rgba(0, 111, 255, 0.14);">
+                <i class="fa-solid fa-satellite-dish"></i>
+              </div>
+              <div class="location-item-details">
+                <span class="location-item-name">CUSTOM FEED OPTIONS</span>
+                <span class="location-item-sub">Toggle built-in default OSINT feeds on/off and add custom SOC blocklists →</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>

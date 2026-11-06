@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Feed Options | SOC Threat Matrix</title>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/x-icon" href="../favicon.png">
+</head>
+<body class="subpage-body" data-page="feeds">
+  <!-- Top Tactical Cross-Page Navigation Bar -->
+  <header class="subpage-header">
+    <a href="index.html" class="subpage-brand">
+      <div class="subpage-brand-icon">
+        <i class="fa-solid fa-satellite-dish"></i>
+      </div>
+      <div class="subpage-brand-text">
+        <span class="subpage-brand-title">SOC THREAT MATRIX</span>
+        <span class="subpage-brand-sub">DEFAULT &amp; CUSTOM THREAT INTELLIGENCE FEEDS</span>
+      </div>
+    </a>
+
+    <nav class="subpage-nav-actions">
+      <a href="operator.html" class="nav-action-btn">
+        <i class="fa-solid fa-user-gear"></i>
+        <span>OPERATOR SETTINGS</span>
+      </a>
+      <a href="locations.html" class="nav-action-btn">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>MAP LOCATIONS</span>
+      </a>
+      <a href="feeds.html" class="nav-action-btn active">
+        <i class="fa-solid fa-satellite-dish"></i>
+        <span>CUSTOM FEED OPTIONS</span>
+      </a>
+      <a href="https://github.com/KevinDeVijlder/Threatmap" target="_blank" rel="noopener noreferrer" class="nav-action-btn">
+        <i class="fa-brands fa-github"></i>
+        <span>GITHUB</span>
+      </a>
+      <a href="index.html" class="nav-action-btn primary-nav">
+        <i class="fa-solid fa-earth-americas"></i>
+        <span>THREAT MAP</span>
+      </a>
+      <button id="btn-settings-logout" class="nav-action-btn danger" type="button">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>LOGOUT</span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="settings-page-container">
+    <!-- Top Operator Identity & Telemetry Summary Banner -->
+    <section class="operator-banner-card">
+      <div class="operator-banner-left">
+        <div class="avatar-preview-box large">
+          <img id="profile-avatar-preview" src="" alt="Operator Avatar" style="display: none;" />
+          <span id="profile-avatar-placeholder"><i class="fa-solid fa-user-astronaut"></i></span>
+        </div>
+        <div class="profile-meta">
+          <span class="profile-callsign" id="profile-username-display">OPERATOR</span>
+          <span class="profile-status-tag">UNIFIED THREAT FEED ORCHESTRATION</span>
+        </div>
+      </div>
+
+      <div class="operator-banner-stats">
+        <div class="op-stat-pill">
+          <span class="stat-lbl">DEFAULT FEEDS ON</span>
+          <span class="stat-val" id="stat-default-feeds-count">4 / 4</span>
+        </div>
+        <div class="op-stat-pill">
+          <span class="stat-lbl">CUSTOM FEEDS ON</span>
+          <span class="stat-val" id="stat-custom-feeds-count">0 ACTIVE</span>
+        </div>
+        <div class="op-stat-pill">
+          <span class="stat-lbl">TOTAL ACTIVE FEEDS</span>
+          <span class="stat-val" id="stat-feeds-count">4 ACTIVE</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two-Column Feeds Layout: Built-In Default Feeds (Left) & Custom SOC Feeds (Right) -->
+    <div class="settings-grid">
+      <!-- Column 1: Built-in Default OSINT Feeds (Toggleable ON/OFF) -->
+      <section class="settings-card accent-card">
+        <div class="settings-card-header" style="align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div class="settings-card-title-group" style="flex: 1;">
+            <span class="settings-card-title">
+              <i class="fa-solid fa-globe"></i>
+              <span>BUILT-IN DEFAULT OSINT FEEDS</span>
+            </span>
+            <span class="settings-card-desc">
+              These 4 verified public OSINT feeds are enabled by default so the Threat Map works out of the box. Toggle any default feed <strong>OFF</strong> if your SOC wants to isolate only custom feeds.
+            </span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-shrink: 0;">
+            <button id="btn-enable-all-defaults" class="preset-chip" type="button" title="Turn on all 4 built-in default feeds">
+              ENABLE ALL
+            </button>
+            <button id="btn-disable-all-defaults" class="preset-chip" type="button" title="Turn off all 4 built-in default feeds to stream only custom feeds">
+              DISABLE ALL
+            </button>
+          </div>
+        </div>
+
+        <div id="default-sources-list" class="configured-items-list" style="max-height: 440px;">
+          <div class="ticker-empty">LOADING DEFAULT OSINT FEEDS...</div>
+        </div>
+      </section>
+
+      <!-- Column 2: User-Added Custom SOC Threat Intelligence Feeds -->
+      <section class="settings-card">
+        <div class="settings-card-header">
+          <div class="settings-card-title-group">
+            <span class="settings-card-title">
+              <i class="fa-solid fa-satellite-dish"></i>
+              <span>CUSTOM SOC THREAT FEEDS</span>
+            </span>
+            <span class="settings-card-desc">
+              Add your own remote IP blocklists (TXT, CSV, JSON) or direct <code>IP:Port</code> indicators. Each custom feed can also be toggled ON/OFF or removed at any time.
+            </span>
+          </div>
+        </div>
+
+        <form id="feed-form" class="config-form">
+          <div class="config-field">
+            <label for="source-name-input">FEED CALLSIGN / LABEL *</label>
+            <input id="source-name-input" type="text" placeholder="e.g. WAN_FIREWALL / HONEYPOT_CLUSTER / INTERNAL_SIEM" required />
+          </div>
+
+          <div class="config-field">
+            <label for="source-url-input">FEED URL OR DIRECT IP:PORT *</label>
+            <input id="source-url-input" type="text" placeholder="https://.../ipblocklist.txt or 185.220.101.1:443" required />
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button id="btn-add-source" class="btn-submit-config" type="submit">
+              <i class="fa-solid fa-plus"></i> + ADD CUSTOM FEED
+            </button>
+          </div>
+        </form>
+
+        <!-- Quick-Add Additional Public OSINT Feed Presets -->
+        <div class="presets-bar">
+          <span class="presets-label">ADDITIONAL OSINT PRESETS:</span>
+          <button class="preset-chip feed-preset-btn" type="button" data-name="BLOCKLIST_DE" data-url="https://lists.blocklist.de/lists/all.txt">
+            + Blocklist.de Attackers
+          </button>
+          <button class="preset-chip feed-preset-btn" type="button" data-name="EMERGING_COMPROMISED" data-url="https://rules.emergingthreats.net/blockrules/compromised-ips.txt">
+            + EmergingThreats Compromised IPs
+          </button>
+          <button class="preset-chip feed-preset-btn" type="button" data-name="FEODO_RECOMMENDED" data-url="https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt">
+            + Feodo Recommended TXT
+          </button>
+        </div>
+
+        <div id="feed-status-toast" class="status-toast"></div>
+
+        <div id="custom-sources-list" class="configured-items-list">
+          <div class="ticker-empty">NO CUSTOM SOC FEEDS ADDED YET</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>

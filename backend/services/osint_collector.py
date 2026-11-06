@@ -20,16 +20,15 @@ from services.taxonomy import build_attack_event
 from ws_manager import manager
 
 
-async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
+async def fetch_custom_user_pool(user_id: int, enabled_custom_sources: List[Dict]) -> List[Dict]:
     """
-    Fetches and geolocates IPs from the user's configured custom_sources.
+    Fetches and geolocates IPs from the user's enabled non-default custom_sources.
     Supports both remote feed URLs (plain text, JSON, CSV) and direct IPv4 entries.
     """
-    sources = get_user_custom_sources(user_id)
-    if not sources:
+    if not enabled_custom_sources:
         return []
 
-    sources_hash = json.dumps(sources, sort_keys=True)
+    sources_hash = json.dumps(enabled_custom_sources, sort_keys=True)
     cached = manager.user_custom_pools.get(user_id)
     now = time.time()
     if cached and cached["hash"] == sources_hash and (now - cached["ts"] < 300):
@@ -40,7 +39,7 @@ async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
     custom_ports = [22, 80, 443, 445, 3389, 8080]
 
     async with httpx.AsyncClient(timeout=10.0, headers=headers, follow_redirects=True) as client:
-        for src in sources:
+        for src in enabled_custom_sources:
             feed_name = (src.get("name") or "CUSTOM_FEED").upper().replace(" ", "_")[:16]
             feed_url = (src.get("url") or "").strip()
             if not feed_url:
@@ -55,6 +54,7 @@ async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
                     "ip": ip_part,
                     "port": int(port_part) if (port_part and port_part.isdigit()) else 443,
                     "raw_name": feed_name,
+                    "feed_id": src.get("id") or "custom",
                 }
                 continue
 
@@ -82,6 +82,7 @@ async def fetch_custom_user_pool(user_id: int) -> List[Dict]:
                                     if (port_part and port_part.isdigit())
                                     else random.choice(custom_ports),
                                     "raw_name": feed_name,
+                                    "feed_id": src.get("id") or "custom",
                                 }
                             if len(raw_by_ip) >= 100:
                                 break
@@ -122,6 +123,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
                                 "ip": ip,
                                 "port": int(entry.get("port") or 443),
                                 "raw_name": str(entry.get("malware") or "BOTNET_C2"),
+                                "feed_id": "feodo_tracker",
                             }
         except Exception as e:
             logger.warning(f"Feodo Tracker fetch warning: {e}")
@@ -154,6 +156,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
                                 if (port_part and port_part.isdigit())
                                 else 80,
                                 "raw_name": str(malware),
+                                "feed_id": "threatfox",
                             }
         except Exception as e:
             logger.warning(f"ThreatFox fetch warning: {e}")
@@ -186,6 +189,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
                                 if (port_part and port_part.isdigit())
                                 else 80,
                                 "raw_name": family,
+                                "feed_id": "urlhaus",
                             }
         except Exception as e:
             logger.warning(f"URLhaus fetch warning: {e}")
@@ -206,6 +210,7 @@ async def fetch_public_osint_pool() -> List[Dict]:
                             "ip": ip_str,
                             "port": random.choice(COMMON_PORTS),
                             "raw_name": "SCANNER",
+                            "feed_id": "cins_army",
                         }
         except Exception as e:
             logger.warning(f"CINS feed fetch warning: {e}")
@@ -291,35 +296,54 @@ async def osint_worker() -> None:
             else:
                 last_fetch_time = now - 570
 
-        # Broadcast to clients in LIVE mode (including user's pinned target IPs when authenticated)
-        if ioc_pool and target_pool:
-            live_item = random.choice(ioc_pool)
-            default_live_event = build_attack_event(live_item, target_pool, feed_mode="live")
-            for ws, meta in list(manager.clients.items()):
-                if meta.get("mode") != "live":
-                    continue
-                uid = meta.get("user_id")
-                if uid is not None:
-                    effective_targets = build_user_target_pool(uid, target_pool)
-                    await manager.send_to_client(
-                        ws, build_attack_event(live_item, effective_targets, feed_mode="live")
-                    )
-                else:
-                    await manager.send_to_client(ws, default_live_event)
+        # Stream unified threat intelligence to all connected clients:
+        # - Unauthenticated guests receive all 4 built-in Default Feeds
+        # - Authenticated operators receive their enabled Default Feeds + enabled Custom Feeds
+        if target_pool:
+            default_guest_event = (
+                build_attack_event(random.choice(ioc_pool), target_pool, feed_mode="unified")
+                if ioc_pool
+                else None
+            )
 
-        # Stream custom feed events to authenticated clients in CUSTOM mode
-        custom_clients = [
-            (ws, meta["user_id"])
-            for ws, meta in list(manager.clients.items())
-            if meta.get("mode") == "custom" and meta.get("user_id") is not None
-        ]
-        for ws, user_id in custom_clients:
-            user_pool = await fetch_custom_user_pool(user_id)
-            if user_pool and target_pool:
-                effective_targets = build_user_target_pool(user_id, target_pool)
-                custom_item = random.choice(user_pool)
-                await manager.send_to_client(
-                    ws, build_attack_event(custom_item, effective_targets, feed_mode="custom")
-                )
+            for ws, meta in list(manager.clients.items()):
+                uid = meta.get("user_id")
+                if uid is None:
+                    if default_guest_event:
+                        await manager.send_to_client(ws, default_guest_event)
+                    continue
+
+                user_sources = get_user_custom_sources(uid)
+                enabled_default_ids = {
+                    s["id"]
+                    for s in user_sources
+                    if s.get("is_default") and s.get("enabled", True)
+                }
+                enabled_custom_sources = [
+                    s
+                    for s in user_sources
+                    if not s.get("is_default") and s.get("enabled", True)
+                ]
+
+                active_pool: List[Dict] = []
+                if ioc_pool and enabled_default_ids:
+                    active_pool.extend(
+                        item
+                        for item in ioc_pool
+                        if item.get("feed_id", "feodo_tracker") in enabled_default_ids
+                    )
+
+                if enabled_custom_sources:
+                    custom_pool = await fetch_custom_user_pool(uid, enabled_custom_sources)
+                    if custom_pool:
+                        # Weight custom indicators so user-added feeds are well represented
+                        active_pool.extend(custom_pool * 2 if active_pool else custom_pool)
+
+                if active_pool:
+                    effective_targets = build_user_target_pool(uid, target_pool)
+                    chosen_item = random.choice(active_pool)
+                    await manager.send_to_client(
+                        ws, build_attack_event(chosen_item, effective_targets, feed_mode="unified")
+                    )
 
         await asyncio.sleep(random.uniform(0.8, 1.7))

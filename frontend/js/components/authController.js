@@ -2,53 +2,18 @@
  * Authentication & Header Navigation Controller (Map Dashboard)
  * =============================================================
  * Verifies active operator session on the Threat Map, syncs custom monitored
- * locations, updates the top-right operator menu, and routes to the dedicated
- * `login.html` and `settings.html` pages.
+ * locations & active feeds, updates the top-right hover-only operator menu
+ * (Operator Settings, Map Locations, Custom Feed Options, GitHub Project, Logout),
+ * and routes to the dedicated subpages (`operator.html`, `locations.html`, `feeds.html`).
  */
 
 import { CONFIG } from "../config.js";
 
+const GITHUB_REPO_URL = "https://github.com/KevinDeVijlder/Threatmap";
+
 export class AuthController {
   constructor(app) {
     this.app = app;
-  }
-
-  switchFeedMode(mode) {
-    if (mode === "custom" && !this.app.currentUser) {
-      window.location.href = "login.html?redirect=settings.html";
-      return;
-    }
-
-    this.app.activeFeedMode = mode;
-    this.app.attacks = [];
-    this.app.ripples = [];
-    this.app.rawAttackBuffer = [];
-    this.app.selectedAttack = null;
-    this.app.updateAttackDossier();
-
-    if (mode === "live") {
-      this.app.btnModeLive.classList.add("active");
-      this.app.btnModeLive.classList.remove("inactive");
-      this.app.btnModeCustom.classList.remove("active");
-      this.app.btnModeCustom.classList.add("inactive");
-      this.app.feedModeLabel.textContent = this.app.isStreamPaused
-        ? "STREAM PAUSED"
-        : "LIVE OSINT STREAM";
-      this.app.attackTicker.innerHTML = `<div class="ticker-empty">LISTENING FOR LIVE OSINT INTRUSIONS...</div>`;
-    } else {
-      this.app.btnModeCustom.classList.add("active");
-      this.app.btnModeCustom.classList.remove("inactive");
-      this.app.btnModeLive.classList.remove("active");
-      this.app.btnModeLive.classList.add("inactive");
-      this.app.feedModeLabel.textContent = `CUSTOM // ${this.app.currentUser.username.toUpperCase()}`;
-
-      const hasSources = (this.app.currentUser.custom_sources || []).length > 0;
-      this.app.attackTicker.innerHTML = hasSources
-        ? `<div class="ticker-empty">STREAMING FROM YOUR CUSTOM FEEDS...</div>`
-        : `<div class="ticker-empty">NO CUSTOM FEEDS ADDED YET.<br/><a href="settings.html#feeds" style="color: var(--color-accent);">OPEN CONFIGURATION PAGE TO ADD SOURCES →</a></div>`;
-    }
-
-    this.app.socketService.sendModeUpdate();
   }
 
   async checkExistingSession() {
@@ -88,20 +53,57 @@ export class AuthController {
     this.app.renderPinnedNodesLegend();
   }
 
+  updateStreamLabels() {
+    if (this.app.isStreamPaused) {
+      if (this.app.feedModeLabel) this.app.feedModeLabel.textContent = "STREAM PAUSED";
+      return;
+    }
+
+    if (this.app.currentUser) {
+      const sources = this.app.currentUser.custom_sources || [];
+      const enabledCount = sources.filter((s) => s.enabled !== false).length;
+      const customEnabledCount = sources.filter(
+        (s) => !s.is_default && s.enabled !== false
+      ).length;
+
+      if (this.app.feedStreamStatus) {
+        this.app.feedStreamStatus.textContent =
+          enabledCount > 0
+            ? `ACTIVE STREAM (${enabledCount} FEEDS ON)`
+            : "ALL FEEDS DISABLED";
+      }
+      if (this.app.feedModeLabel) {
+        this.app.feedModeLabel.textContent =
+          customEnabledCount > 0
+            ? `UNIFIED + ${customEnabledCount} CUSTOM`
+            : "DEFAULT OSINT STREAM";
+      }
+
+      if (enabledCount === 0 && this.app.attackTicker && this.app.rawAttackBuffer.length === 0) {
+        this.app.attackTicker.innerHTML = `<div class="ticker-empty">ALL THREAT FEEDS ARE TURNED OFF.<br/><a href="feeds.html" style="color: var(--color-accent);">OPEN CUSTOM FEED OPTIONS TO ENABLE FEEDS →</a></div>`;
+      }
+    } else {
+      if (this.app.feedStreamStatus) {
+        this.app.feedStreamStatus.textContent = "ACTIVE THREAT STREAM (4 DEFAULT FEEDS)";
+      }
+      if (this.app.feedModeLabel) {
+        this.app.feedModeLabel.textContent = "LIVE OSINT STREAM";
+      }
+    }
+  }
+
   updateUserHeaderUI() {
     if (this.app.currentUser) {
-      this.app.customModeWrapper.classList.remove("locked");
-      this.app.btnModeCustom.classList.remove("locked");
-      this.app.btnModeCustom.disabled = false;
-
       this.app.btnUserProfile.classList.remove("logged-out");
       this.app.btnUserProfile.classList.add("logged-in");
 
-      this.app.dropdownUserStatus.textContent = `OPERATOR // ${this.app.currentUser.username.toUpperCase()}`;
-      this.app.menuIconAccount.className = "fa-solid fa-user-gear";
-      this.app.menuTextAccount.textContent = "OPERATOR SETTINGS";
-      this.app.menuBtnFeeds.classList.remove("disabled");
-      this.app.menuBtnLogout.classList.remove("disabled");
+      this.app.dropdownUserStatus.textContent = `OPERATOR ${this.app.currentUser.username.toUpperCase()}`;
+      if (this.app.dropdownLoginLink) {
+        this.app.dropdownLoginLink.style.display = "none";
+      }
+      if (this.app.menuBtnLogout) {
+        this.app.menuBtnLogout.classList.remove("disabled");
+      }
 
       if (this.app.currentUser.avatar) {
         this.app.userAvatarImg.src = this.app.currentUser.avatar;
@@ -112,78 +114,82 @@ export class AuthController {
         this.app.userDefaultIcon.style.display = "block";
       }
     } else {
-      this.app.customModeWrapper.classList.add("locked");
-      this.app.btnModeCustom.classList.add("locked");
-      this.app.btnModeCustom.disabled = true;
-      if (this.app.activeFeedMode === "custom") {
-        this.switchFeedMode("live");
-      }
-
       this.app.btnUserProfile.classList.add("logged-out");
       this.app.btnUserProfile.classList.remove("logged-in");
       this.app.userAvatarImg.style.display = "none";
       this.app.userDefaultIcon.style.display = "block";
 
-      this.app.dropdownUserStatus.textContent = "UNAUTHENTICATED SESSION";
-      this.app.menuIconAccount.className = "fa-solid fa-user-plus";
-      this.app.menuTextAccount.textContent = "REGISTER / LOGIN";
-      this.app.menuBtnFeeds.classList.add("disabled");
-      this.app.menuBtnLogout.classList.add("disabled");
+      this.app.dropdownUserStatus.textContent = "GUEST SESSION";
+      if (this.app.dropdownLoginLink) {
+        this.app.dropdownLoginLink.style.display = "inline-block";
+      }
+      if (this.app.menuBtnLogout) {
+        this.app.menuBtnLogout.classList.add("disabled");
+      }
     }
+
+    this.updateStreamLabels();
   }
 
   bindAuthEvents() {
-    this.app.btnModeLive.addEventListener("click", () => {
-      this.switchFeedMode("live");
-    });
+    // Note: #btn-user-profile is intentionally hover-only and NOT clickable.
 
-    this.app.btnModeCustom.addEventListener("click", () => {
-      if (this.app.currentUser) {
-        this.switchFeedMode("custom");
-      } else {
-        window.location.href = "login.html";
-      }
-    });
+    // 1. Operator Settings
+    if (this.app.menuBtnOperator) {
+      this.app.menuBtnOperator.addEventListener("click", () => {
+        window.location.href = this.app.currentUser
+          ? "operator.html"
+          : "login.html?redirect=operator.html";
+      });
+    }
 
-    this.app.btnUserProfile.addEventListener("click", () => {
-      window.location.href = this.app.currentUser
-        ? "settings.html"
-        : "login.html";
-    });
+    // 2. Map Locations
+    if (this.app.menuBtnLocations) {
+      this.app.menuBtnLocations.addEventListener("click", () => {
+        window.location.href = this.app.currentUser
+          ? "locations.html"
+          : "login.html?redirect=locations.html";
+      });
+    }
 
-    this.app.menuBtnAccount.addEventListener("click", () => {
-      window.location.href = this.app.currentUser
-        ? "settings.html"
-        : "login.html";
-    });
+    // 3. Custom Feed Options
+    if (this.app.menuBtnFeeds) {
+      this.app.menuBtnFeeds.addEventListener("click", () => {
+        window.location.href = this.app.currentUser
+          ? "feeds.html"
+          : "login.html?redirect=feeds.html";
+      });
+    }
 
-    this.app.menuBtnFeeds.addEventListener("click", () => {
-      if (this.app.currentUser) {
-        window.location.href = "settings.html#locations";
-      } else {
-        window.location.href = "login.html?redirect=settings.html";
-      }
-    });
+    // 4. Go to GitHub Project
+    if (this.app.menuBtnGithub) {
+      this.app.menuBtnGithub.addEventListener("click", () => {
+        window.open(GITHUB_REPO_URL, "_blank", "noopener,noreferrer");
+      });
+    }
 
-    this.app.menuBtnLogout.addEventListener("click", async () => {
-      if (!this.app.currentUser) return;
-      if (this.app.authToken) {
-        await fetch(`${CONFIG.apiBase}/api/logout`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${this.app.authToken}` },
-        }).catch(() => {});
-      }
-      this.app.authToken = null;
-      this.app.currentUser = null;
-      this.app.customLocations = [];
-      localStorage.removeItem("soc_auth_token");
-      localStorage.removeItem("soc_custom_locations");
-      if (this.app.onlyPinnedFilter) {
-        this.app.togglePinnedIpFilter();
-      }
-      this.updateUserHeaderUI();
-      this.app.renderPinnedNodesLegend();
-      this.app.socketService.sendModeUpdate();
-    });
+    // 5. Logout
+    if (this.app.menuBtnLogout) {
+      this.app.menuBtnLogout.addEventListener("click", async () => {
+        if (!this.app.currentUser) return;
+        if (this.app.authToken) {
+          await fetch(`${CONFIG.apiBase}/api/logout`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${this.app.authToken}` },
+          }).catch(() => {});
+        }
+        this.app.authToken = null;
+        this.app.currentUser = null;
+        this.app.customLocations = [];
+        localStorage.removeItem("soc_auth_token");
+        localStorage.removeItem("soc_custom_locations");
+        if (this.app.onlyPinnedFilter) {
+          this.app.togglePinnedIpFilter();
+        }
+        this.updateUserHeaderUI();
+        this.app.renderPinnedNodesLegend();
+        this.app.socketService.sendAuthUpdate();
+      });
+    }
   }
 }

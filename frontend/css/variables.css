@@ -5,7 +5,7 @@
 :root {
   --color-primary: #006FFF;                 /* UniFi Electric Blue */
   --color-primary-glow: rgba(0, 111, 255, 0.65);
-  --color-accent: #00F0FF;                  /* Neon Cyan */
+  --color-accent: #3B82F6;                  /* Bright Electric Royal Blue */
 
   /* Gold Country Dossier Theme Tokens */
   --color-gold: #FFB800;
@@ -20,13 +20,13 @@
 
   --color-hud-bg: rgba(6, 15, 32, 0.82);
   --color-border: rgba(0, 111, 255, 0.38);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(0, 170, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(0, 111, 255, 0.14);
   --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
 
   /* Cohesive 3-Level Cyber Telemetry Palette */
   --color-high: #FF5E36;                    /* Cyber Flame Coral (High / Critical) */
   --color-med: #FFB800;                     /* Solar Amber Gold (Medium) */
-  --color-low: #00A3FF;                     /* Electric Azure Blue (Low / Info) */
+  --color-low: #006FFF;                     /* Primary Electric Blue (Low / Info) */
 }
 
 * {
