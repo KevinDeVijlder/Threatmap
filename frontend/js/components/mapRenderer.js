@@ -271,6 +271,18 @@ export class MapRenderer {
    */
   renderPinnedNodesLegend() {
     if (!this.app.pinnedNodesList) return;
+
+    if (!this.app.currentUser) {
+      this.app.pinnedNodesList.innerHTML = `
+        <div class="pinned-nodes-empty">
+          Not signed in. <a href="login.html">Login to view your nodes →</a>
+        </div>
+      `;
+      this.lastAlarmSignature = "";
+      this.updatePinnedNodesAlarmDOM(performance.now());
+      return;
+    }
+
     const locations = this.app.customLocations || [];
 
     if (locations.length === 0) {
@@ -320,12 +332,14 @@ export class MapRenderer {
    */
   updatePinnedNodesAlarmDOM(now = performance.now()) {
     if (!this.app.pinnedAlarmIndicator || !this.app.pinnedNodesHud) return;
-    const locations = this.app.customLocations || [];
+    const locations = this.app.currentUser ? this.app.customLocations || [] : [];
 
     const attackedNodes = locations.filter((loc) =>
       this.isLocationUnderAttack(loc, now)
     );
-    const sig = attackedNodes.map((l) => l.id || l.name).join("|");
+    const sig = `${this.app.currentUser ? "auth" : "anon"}:${attackedNodes
+      .map((l) => l.id || l.name)
+      .join("|")}`;
     if (sig === this.lastAlarmSignature) return;
     this.lastAlarmSignature = sig;
 
@@ -375,6 +389,7 @@ export class MapRenderer {
     this.updatePinnedNodesAlarmDOM(now);
 
     if (
+      !this.app.currentUser ||
       !this.app.projection ||
       !this.app.customLocations ||
       this.app.customLocations.length === 0

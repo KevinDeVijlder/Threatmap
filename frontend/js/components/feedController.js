@@ -23,7 +23,7 @@ export class FeedController {
    * matches any of the user's pinned IP addresses.
    */
   matchesPinnedIp(data) {
-    if (!data) return false;
+    if (!data || !this.app.currentUser) return false;
     if (data._matchesPinnedIp) return true;
     const locations = this.app.customLocations || [];
     if (locations.length === 0) return false;
@@ -73,6 +73,10 @@ export class FeedController {
   }
 
   togglePinnedIpFilter() {
+    if (!this.app.currentUser && !this.app.onlyPinnedFilter) {
+      window.location.href = "login.html";
+      return;
+    }
     this.app.onlyPinnedFilter = !this.app.onlyPinnedFilter;
     const isActive = this.app.onlyPinnedFilter;
 

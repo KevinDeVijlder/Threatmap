@@ -79,15 +79,7 @@ export class ThreatMap {
 
     this.authToken = localStorage.getItem("soc_auth_token") || null;
     this.currentUser = null;
-
-    // Load cached custom locations for immediate rendering while /api/me resolves
-    try {
-      this.customLocations = JSON.parse(
-        localStorage.getItem("soc_custom_locations") || "[]"
-      );
-    } catch {
-      this.customLocations = [];
-    }
+    this.customLocations = [];
 
     this.cursorTooltip = document.getElementById("cursor-tooltip");
     this.cursorTooltipFlag = document.getElementById("cursor-tooltip-flag");
@@ -387,7 +379,11 @@ export class ThreatMap {
     const srcIp = normalizeIp(data.srcIp);
 
     let matchedLoc = null;
-    if (this.customLocations && this.customLocations.length > 0) {
+    if (
+      this.currentUser &&
+      this.customLocations &&
+      this.customLocations.length > 0
+    ) {
       const matchingLocs = this.customLocations.filter((loc) => {
         const locIp = normalizeIp(loc.ip);
         return (

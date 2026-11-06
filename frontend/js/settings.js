@@ -65,6 +65,7 @@ class SettingsPageController {
       });
       if (!res.ok) {
         localStorage.removeItem("soc_auth_token");
+        localStorage.removeItem("soc_custom_locations");
         window.location.href = "login.html?redirect=settings.html";
         return;
       }
@@ -259,6 +260,7 @@ class SettingsPageController {
         }).catch(() => {});
       }
       localStorage.removeItem("soc_auth_token");
+      localStorage.removeItem("soc_custom_locations");
       window.location.href = "index.html";
     });
 

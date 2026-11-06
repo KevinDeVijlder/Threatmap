@@ -52,8 +52,11 @@ export class AuthController {
   }
 
   async checkExistingSession() {
+    this.app.currentUser = null;
+    this.app.customLocations = [];
+
     if (!this.app.authToken) {
-      this.app.customLocations = [];
+      localStorage.removeItem("soc_custom_locations");
       this.updateUserHeaderUI();
       this.app.renderPinnedNodesLegend();
       return;
@@ -72,11 +75,15 @@ export class AuthController {
         );
       } else {
         this.app.authToken = null;
+        this.app.currentUser = null;
         this.app.customLocations = [];
         localStorage.removeItem("soc_auth_token");
         localStorage.removeItem("soc_custom_locations");
       }
-    } catch {}
+    } catch {
+      this.app.currentUser = null;
+      this.app.customLocations = [];
+    }
     this.updateUserHeaderUI();
     this.app.renderPinnedNodesLegend();
   }
@@ -171,8 +178,12 @@ export class AuthController {
       this.app.customLocations = [];
       localStorage.removeItem("soc_auth_token");
       localStorage.removeItem("soc_custom_locations");
+      if (this.app.onlyPinnedFilter) {
+        this.app.togglePinnedIpFilter();
+      }
       this.updateUserHeaderUI();
       this.app.renderPinnedNodesLegend();
+      this.app.socketService.sendModeUpdate();
     });
   }
 }

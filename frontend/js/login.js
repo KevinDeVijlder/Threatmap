@@ -80,6 +80,7 @@ class LoginPageController {
       } else {
         this.authToken = null;
         localStorage.removeItem("soc_auth_token");
+        localStorage.removeItem("soc_custom_locations");
       }
     } catch {}
   }
@@ -168,6 +169,7 @@ class LoginPageController {
       }
       this.authToken = null;
       localStorage.removeItem("soc_auth_token");
+      localStorage.removeItem("soc_custom_locations");
       this.authPageTitle.textContent = "SOC OPERATOR AUTHENTICATION";
       this.authLoggedInSection.style.display = "none";
       this.authFormSection.style.display = "flex";
