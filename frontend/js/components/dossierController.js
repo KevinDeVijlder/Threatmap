@@ -238,9 +238,10 @@ export class DossierController {
 
     this.app.atkDossierDistance.textContent = `VECTOR DISTANCE: ${distKm.toLocaleString()} KM`;
 
-    this.app.atkDossierDstPort.textContent = `PORT: ${d.port || 443} / ${
-      d.proto || "TCP"
-    }`;
+    const dstIpClean = d.dstIp && d.dstIp !== "N/A" ? d.dstIp.trim() : "";
+    this.app.atkDossierDstPort.textContent = dstIpClean
+      ? `IP: ${dstIpClean} // PORT: ${d.port || 443}/${d.proto || "TCP"}`
+      : `PORT: ${d.port || 443} / ${d.proto || "TCP"}`;
     this.app.atkDossierDstFlag.src = `https://flagcdn.com/w40/${dstCode}.png`;
     this.app.atkDossierDstLoc.textContent = `${dstCity}, ${
       d.dstCountry

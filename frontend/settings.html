@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator Configuration // Threat Map</title>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/x-icon" href="../favicon.png">
+</head>
+<body class="subpage-body">
+  <!-- Top Tactical Navigation Bar -->
+  <header class="subpage-header">
+    <a href="index.html" class="subpage-brand">
+      <div class="subpage-brand-icon">
+        <i class="fa-solid fa-sliders"></i>
+      </div>
+      <div class="subpage-brand-text">
+        <span class="subpage-brand-title">SOC THREAT MATRIX // CONFIGURATION</span>
+        <span class="subpage-brand-sub">CUSTOM INTEL FEEDS &amp; MONITORED MAP LOCATIONS</span>
+      </div>
+    </a>
+
+    <div class="subpage-nav-actions">
+      <a href="index.html" class="nav-action-btn">
+        <i class="fa-solid fa-earth-americas"></i>
+        <span>LAUNCH THREAT MAP</span>
+      </a>
+      <button id="btn-settings-logout" class="nav-action-btn danger" type="button">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>LOGOUT</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="settings-page-container">
+    <!-- Top Operator Identity & Telemetry Summary Banner -->
+    <section class="operator-banner-card">
+      <div class="operator-banner-left">
+        <div class="avatar-preview-box large">
+          <img id="profile-avatar-preview" src="" alt="Operator Avatar" style="display: none;" />
+          <span id="profile-avatar-placeholder"><i class="fa-solid fa-user-astronaut"></i></span>
+        </div>
+        <div class="profile-meta">
+          <span class="profile-callsign" id="profile-username-display">OPERATOR</span>
+          <span class="profile-status-tag">AUTHENTICATED SOC OPERATOR</span>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+            <label class="file-upload-btn small">
+              <i class="fa-solid fa-camera"></i> CHANGE AVATAR
+              <input id="profile-avatar-input" type="file" accept="image/*" hidden />
+            </label>
+            <button id="btn-reset-local-stats" class="file-upload-btn small" type="button" title="Reset Local Browser Attack Counters">
+              <i class="fa-solid fa-rotate-left"></i> RESET LOCAL STATS
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="operator-banner-stats">
+        <div class="op-stat-pill">
+          <span class="stat-lbl">MONITORED LOCATIONS</span>
+          <span class="stat-val" id="stat-locations-count">0 NODES</span>
+        </div>
+        <div class="op-stat-pill">
+          <span class="stat-lbl">CUSTOM INTEL FEEDS</span>
+          <span class="stat-val" id="stat-feeds-count">0 SOURCES</span>
+        </div>
+        <div class="op-stat-pill">
+          <span class="stat-lbl">SESSION HITS LOGGED</span>
+          <span class="stat-val" id="stat-local-hits">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two-Column Configuration Grid -->
+    <div class="settings-grid">
+      <!-- Column 1: Monitored Map Locations (IP + Geolocation + City Icon on Map) -->
+      <section id="locations" class="settings-card accent-card">
+        <div class="settings-card-header">
+          <div class="settings-card-title-group">
+            <span class="settings-card-title">
+              <i class="fa-solid fa-city"></i>
+              <span>MONITORED MAP LOCATIONS &amp; INFRASTRUCTURE NODES</span>
+            </span>
+            <span class="settings-card-desc">
+              Pin custom IP addresses or coordinates onto the global Threat Map with a glowing City Icon and label underneath. Enter an IP and click <strong>AUTO-LOCATE IP</strong> or specify exact coordinates.
+            </span>
+          </div>
+        </div>
+
+        <form id="location-form" class="config-form">
+          <div class="form-row-2col">
+            <div class="config-field">
+              <label for="loc-name-input">LOCATION / ASSET NAME *</label>
+              <input id="loc-name-input" type="text" placeholder="e.g. HQ FIREWALL / AMSTERDAM DC" required />
+            </div>
+
+            <div class="form-row-ip-lookup">
+              <div class="config-field">
+                <label for="loc-ip-input">IPv4 ADDRESS OR HOST *</label>
+                <input id="loc-ip-input" type="text" placeholder="e.g. 8.8.8.8 or 192.0.2.1" required />
+              </div>
+              <button id="btn-auto-geolocate" class="btn-geolocate" type="button" title="Resolve Latitude, Longitude & City from IP">
+                <i class="fa-solid fa-crosshairs"></i> AUTO-LOCATE IP
+              </button>
+            </div>
+          </div>
+
+          <div class="form-row-coords">
+            <div class="config-field">
+              <label for="loc-lat-input">LATITUDE (-90° TO 90°)</label>
+              <input id="loc-lat-input" type="number" step="any" min="-90" max="90" placeholder="Auto or e.g. 52.3676" />
+            </div>
+            <div class="config-field">
+              <label for="loc-lon-input">LONGITUDE (-180° TO 180°)</label>
+              <input id="loc-lon-input" type="number" step="any" min="-180" max="180" placeholder="Auto or e.g. 4.9041" />
+            </div>
+            <div class="config-field">
+              <label for="loc-color-input">PIN CATEGORY &amp; ICON</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="loc-type-preview" class="location-city-icon" style="width: 33px; height: 33px; color: #00F0FF; border-color: #00F0FF;">
+                  <i id="loc-type-preview-icon" class="fa-solid fa-city"></i>
+                </div>
+                <select id="loc-color-input" style="flex: 1;">
+                  <option value="#00F0FF">NEON CYAN — DEFAULT CITY (🏙️ City)</option>
+                  <option value="#006FFF">ELECTRIC BLUE — SOC CORE (🛡️ Shield)</option>
+                  <option value="#10B981">EMERALD GREEN — SENSOR (📡 Dish)</option>
+                  <option value="#FFB800">SOLAR GOLD — HIGH VALUE (👑 Crown)</option>
+                  <option value="#FF5E36">FLAME CORAL — HONEYPOT (🐛 Bug)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hidden / auto-populated metadata fields -->
+          <input id="loc-city-input" type="hidden" value="" />
+          <input id="loc-country-input" type="hidden" value="" />
+          <input id="loc-code-input" type="hidden" value="" />
+
+          <div class="config-checkbox-row">
+            <label class="checkbox-label">
+              <input id="loc-target-checkbox" type="checkbox" checked />
+              <span>Include as a destination target in Custom Intel Feed mode</span>
+            </label>
+            <button id="btn-add-location" class="btn-submit-config" type="submit">
+              <i class="fa-solid fa-location-dot"></i> + PIN LOCATION TO MAP
+            </button>
+          </div>
+        </form>
+
+        <!-- Quick-Add Location Presets -->
+        <div class="presets-bar">
+          <span class="presets-label">QUICK-ADD SAMPLES:</span>
+          <button class="preset-chip loc-preset-btn" type="button" data-name="GOOGLE DNS CORE" data-ip="8.8.8.8" data-color="#00F0FF">
+            + Google DNS (8.8.8.8)
+          </button>
+          <button class="preset-chip loc-preset-btn" type="button" data-name="CLOUDFLARE EDGE" data-ip="1.1.1.1" data-color="#10B981">
+            + Cloudflare (1.1.1.1)
+          </button>
+          <button class="preset-chip loc-preset-btn" type="button" data-name="QUAD9 ZURICH" data-ip="9.9.9.9" data-color="#FFB800">
+            + Quad9 SOC (9.9.9.9)
+          </button>
+        </div>
+
+        <div id="loc-status-toast" class="status-toast"></div>
+
+        <div id="custom-locations-list" class="configured-items-list">
+          <div class="ticker-empty">NO MONITORED LOCATIONS PINNED YET</div>
+        </div>
+      </section>
+
+      <!-- Column 2: Custom Threat Intelligence Feeds -->
+      <section id="feeds" class="settings-card">
+        <div class="settings-card-header">
+          <div class="settings-card-title-group">
+            <span class="settings-card-title">
+              <i class="fa-solid fa-satellite-dish"></i>
+              <span>CUSTOM THREAT INTELLIGENCE FEEDS</span>
+            </span>
+            <span class="settings-card-desc">
+              Configure remote IP blocklists (TXT, CSV, JSON) or direct <code>IP:Port</code> indicators to stream when <strong>CUSTOM INTEL FEED</strong> mode is active on the map.
+            </span>
+          </div>
+        </div>
+
+        <form id="feed-form" class="config-form">
+          <div class="config-field">
+            <label for="source-name-input">FEED CALLSIGN / LABEL *</label>
+            <input id="source-name-input" type="text" placeholder="e.g. FEODO_C2 / WAN_FIREWALL / HONEYPOT" required />
+          </div>
+
+          <div class="config-field">
+            <label for="source-url-input">FEED URL OR DIRECT IP:PORT *</label>
+            <input id="source-url-input" type="text" placeholder="https://.../ipblocklist.txt or 185.220.101.1:443" required />
+          </div>
+
+          <div style="display: flex; justify-content: flex-end;">
+            <button id="btn-add-source" class="btn-submit-config" type="submit">
+              <i class="fa-solid fa-plus"></i> + ADD INTEL FEED
+            </button>
+          </div>
+        </form>
+
+        <!-- Quick-Add Public OSINT Feed Presets -->
+        <div class="presets-bar">
+          <span class="presets-label">VERIFIED OSINT PRESETS:</span>
+          <button class="preset-chip feed-preset-btn" type="button" data-name="FEODO_TRACKER" data-url="https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt">
+            + Feodo C2 Blocklist
+          </button>
+          <button class="preset-chip feed-preset-btn" type="button" data-name="CINS_BADGUYS" data-url="https://cinsscore.com/list/ci-badguys.txt">
+            + CINS Army Scanners
+          </button>
+          <button class="preset-chip feed-preset-btn" type="button" data-name="URLHAUS_ONLINE" data-url="https://urlhaus.abuse.ch/downloads/text_online/">
+            + Abuse.ch URLhaus
+          </button>
+        </div>
+
+        <div id="feed-status-toast" class="status-toast"></div>
+
+        <div id="custom-sources-list" class="configured-items-list">
+          <div class="ticker-empty">NO CUSTOM FEEDS CONFIGURED YET</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>

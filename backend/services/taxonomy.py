@@ -93,6 +93,7 @@ def build_attack_event(item: Dict, target_pool: List[Dict], feed_mode: str = "li
         "srcAsn": src_asn,
         "srcLat": src_lat,
         "srcLon": src_lon,
+        "dstIp": dst.get("ip", "N/A"),
         "dstCountry": dst["country"],
         "dstCode": dst["code"],
         "dstCity": dst["city"],

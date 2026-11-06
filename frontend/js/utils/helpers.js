@@ -1,11 +1,55 @@
 /**
- * Shared Utility & Math Functions
- * ===============================
+ * Shared Utility, Pin Type Taxonomy & Math Functions
+ * ==================================================
  * Pure helper functions for severity classification, color mapping,
- * Haversine geodesic distance, quadratic Bezier interpolation, and image resizing.
+ * 5-category map pin icons, Haversine geodesic distance, quadratic Bezier
+ * interpolation, and image resizing.
  */
 
 import { CONFIG } from "../config.js";
+
+export const PIN_TYPES = {
+  "#00F0FF": {
+    key: "CITY",
+    label: "DEFAULT CITY",
+    faClass: "fa-city",
+    unicode: "\uf64f",
+    color: "#00F0FF",
+  },
+  "#006FFF": {
+    key: "SOC_CORE",
+    label: "SOC CORE",
+    faClass: "fa-shield-halved",
+    unicode: "\uf3ed",
+    color: "#006FFF",
+  },
+  "#10B981": {
+    key: "SENSOR",
+    label: "SENSOR",
+    faClass: "fa-satellite-dish",
+    unicode: "\uf7c0",
+    color: "#10B981",
+  },
+  "#FFB800": {
+    key: "HIGH_VALUE",
+    label: "HIGH VALUE",
+    faClass: "fa-crown",
+    unicode: "\uf521",
+    color: "#FFB800",
+  },
+  "#FF5E36": {
+    key: "HONEYPOT",
+    label: "HONEYPOT",
+    faClass: "fa-bug",
+    unicode: "\uf188",
+    color: "#FF5E36",
+  },
+};
+
+export function getPinTypeMeta(color) {
+  const norm = (color || "#00F0FF").toUpperCase();
+  return PIN_TYPES[norm] || PIN_TYPES["#00F0FF"];
+}
 
 export function resolveSeverityBucket(data) {
   const rawSev = (data.severity || "").toUpperCase();

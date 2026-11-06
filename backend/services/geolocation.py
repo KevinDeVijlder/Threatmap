@@ -75,6 +75,7 @@ async def fetch_dynamic_target_pool() -> List[Dict]:
         enriched = await geolocate_raw_pool(client, raw_targets, max_ips=100)
         target_nodes = [
             {
+                "ip": item.get("ip", "N/A"),
                 "country": item["srcCountry"],
                 "code": item["srcCode"],
                 "city": item["srcCity"],

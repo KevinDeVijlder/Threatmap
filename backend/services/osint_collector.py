@@ -14,7 +14,7 @@ from typing import Dict, List
 import httpx
 
 from config import COMMON_PORTS, CUSTOM_USER_AGENT, IPV4_REGEX, OSINT_USER_AGENT, logger
-from database import get_user_custom_sources
+from database import get_user_custom_locations, get_user_custom_sources
 from services.geolocation import fetch_dynamic_target_pool, geolocate_raw_pool
 from services.taxonomy import build_attack_event
 from ws_manager import manager
@@ -225,6 +225,33 @@ async def fetch_public_osint_pool() -> List[Dict]:
     return enriched_pool
 
 
+def build_user_target_pool(user_id: int, global_targets: List[Dict]) -> List[Dict]:
+    """
+    Combines the user's configured custom locations (where is_target is enabled)
+    with the global target pool so custom mode can target monitored assets by IP.
+    """
+    user_locs = get_user_custom_locations(user_id)
+    custom_targets = [
+        {
+            "ip": (loc.get("ip") or "").strip(),
+            "country": loc.get("country") or "Monitored Asset",
+            "code": (loc.get("code") or "un").lower(),
+            "city": loc.get("name") or loc.get("city") or "Asset",
+            "lat": float(loc.get("lat", 0.0)),
+            "lon": float(loc.get("lon", 0.0)),
+        }
+        for loc in user_locs
+        if loc.get("is_target", True)
+        and loc.get("ip")
+        and loc.get("lat") is not None
+        and loc.get("lon") is not None
+    ]
+    if custom_targets:
+        # Weight custom monitored locations so they are frequently targeted in custom mode
+        return custom_targets * 3 + global_targets
+    return global_targets
+
+
 async def osint_worker() -> None:
     """Background worker loop that refreshes OSINT pools and streams events to clients."""
     logger.info("Starting OSINT Intelligence Collector...")
@@ -249,6 +276,7 @@ async def osint_worker() -> None:
                 # Fallback to geolocated nodes from the IOC pool if ip-api rate-limits target batch
                 target_pool = [
                     {
+                        "ip": x.get("ip", "N/A"),
                         "country": x["srcCountry"],
                         "code": x["srcCode"],
                         "city": x["srcCity"],
@@ -263,12 +291,21 @@ async def osint_worker() -> None:
             else:
                 last_fetch_time = now - 570
 
-        # Broadcast to clients in LIVE mode
+        # Broadcast to clients in LIVE mode (including user's pinned target IPs when authenticated)
         if ioc_pool and target_pool:
             live_item = random.choice(ioc_pool)
-            await manager.broadcast_live(
-                build_attack_event(live_item, target_pool, feed_mode="live")
-            )
+            default_live_event = build_attack_event(live_item, target_pool, feed_mode="live")
+            for ws, meta in list(manager.clients.items()):
+                if meta.get("mode") != "live":
+                    continue
+                uid = meta.get("user_id")
+                if uid is not None:
+                    effective_targets = build_user_target_pool(uid, target_pool)
+                    await manager.send_to_client(
+                        ws, build_attack_event(live_item, effective_targets, feed_mode="live")
+                    )
+                else:
+                    await manager.send_to_client(ws, default_live_event)
 
         # Stream custom feed events to authenticated clients in CUSTOM mode
         custom_clients = [
@@ -279,9 +316,10 @@ async def osint_worker() -> None:
         for ws, user_id in custom_clients:
             user_pool = await fetch_custom_user_pool(user_id)
             if user_pool and target_pool:
+                effective_targets = build_user_target_pool(user_id, target_pool)
                 custom_item = random.choice(user_pool)
                 await manager.send_to_client(
-                    ws, build_attack_event(custom_item, target_pool, feed_mode="custom")
+                    ws, build_attack_event(custom_item, effective_targets, feed_mode="custom")
                 )
 
         await asyncio.sleep(random.uniform(0.8, 1.7))

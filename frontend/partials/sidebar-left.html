@@ -37,6 +37,15 @@
       <button class="filter-chip" data-severity="LOW" type="button">LOW</button>
     </div>
 
+    <!-- Pinned IPs Only Filter Button -->
+    <button id="btn-filter-pinned" class="pinned-ip-filter-btn" type="button" title="Show only threat intelligence targeting your pinned IP addresses">
+      <span class="pinned-filter-left">
+        <i class="fa-solid fa-bullseye"></i>
+        <span>ONLY PINNED IPs</span>
+      </span>
+      <span id="pinned-filter-badge" class="pinned-filter-state">OFF</span>
+    </button>
+
     <div id="attack-ticker" class="attack-ticker">
       <div class="ticker-empty">LISTENING FOR OSINT INTRUSIONS...</div>
     </div>
@@ -56,3 +65,29 @@
     <div id="coords-hud" class="coords-display">00.00° | 00.00°</div>
   </div>
 </aside>
+
+<!-- Floating Map Legend: Pinned Locations & Intrusion Alarm -->
+<div id="pinned-nodes-hud" class="pinned-nodes-hud">
+  <div class="pinned-hud-top">
+    <div class="pinned-hud-title-group">
+      <i class="fa-solid fa-map-pin pinned-hud-icon"></i>
+      <span class="pinned-hud-title">PINNED NODES</span>
+      <button id="btn-hud-filter-pinned" class="pinned-hud-filter-btn" type="button" title="Filter map & feed to show only attacks against pinned IPs">
+        <i class="fa-solid fa-filter"></i>
+      </button>
+      <a href="settings.html#locations" class="pinned-add-link" title="Configure Pinned Locations">+</a>
+    </div>
+
+    <!-- Flashing Alarm Indicator next to the Legend Header -->
+    <div id="pinned-alarm-indicator" class="pinned-alarm-indicator standby">
+      <i id="pinned-alarm-icon" class="fa-solid fa-bell"></i>
+      <span id="pinned-alarm-text">STANDBY</span>
+    </div>
+  </div>
+
+  <div id="pinned-nodes-list" class="pinned-nodes-list">
+    <div class="pinned-nodes-empty">
+      No nodes pinned. <a href="settings.html#locations">Add in Settings →</a>
+    </div>
+  </div>
+</div>

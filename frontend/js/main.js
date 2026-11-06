@@ -37,6 +37,7 @@ export class ThreatMap {
 
     // Filter, Search & Stream Freeze States
     this.currentSeverityFilter = "ALL";
+    this.onlyPinnedFilter = false;
     this.searchQuery = "";
     this.isStreamPaused = false;
     this.rawAttackBuffer = [];
@@ -50,8 +51,17 @@ export class ThreatMap {
     this.btnExportCsv = document.getElementById("btn-export-csv");
     this.feedSearchInput = document.getElementById("feed-search-input");
     this.btnClearSearch = document.getElementById("btn-clear-search");
+    this.btnFilterPinned = document.getElementById("btn-filter-pinned");
+    this.pinnedFilterBadge = document.getElementById("pinned-filter-badge");
+    this.btnHudFilterPinned = document.getElementById("btn-hud-filter-pinned");
 
     this.coordsHud = document.getElementById("coords-hud");
+    this.pinnedNodesHud = document.getElementById("pinned-nodes-hud");
+    this.pinnedAlarmIndicator = document.getElementById("pinned-alarm-indicator");
+    this.pinnedAlarmIcon = document.getElementById("pinned-alarm-icon");
+    this.pinnedAlarmText = document.getElementById("pinned-alarm-text");
+    this.pinnedNodesList = document.getElementById("pinned-nodes-list");
+
     this.hudAttacksTotal = document.getElementById("hud-attacks-total");
     this.hudActiveOrigins = document.getElementById("hud-active-origins");
     this.hudClock = document.getElementById("hud-clock");
@@ -67,38 +77,17 @@ export class ThreatMap {
     this.menuBtnFeeds = document.getElementById("menu-btn-feeds");
     this.menuBtnLogout = document.getElementById("menu-btn-logout");
 
-    this.userModalBackdrop = document.getElementById("user-modal-backdrop");
-    this.modalTitle = document.getElementById("modal-title");
-    this.btnCloseModal = document.getElementById("btn-close-modal");
-    this.modalAuthView = document.getElementById("modal-auth-view");
-    this.modalAccountView = document.getElementById("modal-account-view");
-    this.modalFeedsView = document.getElementById("modal-feeds-view");
-
-    this.tabLogin = document.getElementById("tab-login");
-    this.tabRegister = document.getElementById("tab-register");
-    this.authForm = document.getElementById("auth-form");
-    this.authUsername = document.getElementById("auth-username");
-    this.authPassword = document.getElementById("auth-password");
-    this.registerAvatarGroup = document.getElementById("register-avatar-group");
-    this.regAvatarInput = document.getElementById("reg-avatar-input");
-    this.regAvatarPreview = document.getElementById("reg-avatar-preview");
-    this.regAvatarPlaceholder = document.getElementById("reg-avatar-placeholder");
-    this.authError = document.getElementById("auth-error");
-    this.btnAuthSubmit = document.getElementById("btn-auth-submit");
-
-    this.profileAvatarPreview = document.getElementById("profile-avatar-preview");
-    this.profileAvatarPlaceholder = document.getElementById("profile-avatar-placeholder");
-    this.profileUsernameDisplay = document.getElementById("profile-username-display");
-    this.profileAvatarInput = document.getElementById("profile-avatar-input");
-    this.sourceNameInput = document.getElementById("source-name-input");
-    this.sourceUrlInput = document.getElementById("source-url-input");
-    this.btnAddSource = document.getElementById("btn-add-source");
-    this.customSourcesList = document.getElementById("custom-sources-list");
-
-    this.authMode = "login";
-    this.pendingRegAvatar = "";
     this.authToken = localStorage.getItem("soc_auth_token") || null;
     this.currentUser = null;
+
+    // Load cached custom locations for immediate rendering while /api/me resolves
+    try {
+      this.customLocations = JSON.parse(
+        localStorage.getItem("soc_custom_locations") || "[]"
+      );
+    } catch {
+      this.customLocations = [];
+    }
 
     this.cursorTooltip = document.getElementById("cursor-tooltip");
     this.cursorTooltipFlag = document.getElementById("cursor-tooltip-flag");
@@ -219,6 +208,7 @@ export class ThreatMap {
     this.hudAttacksTotal.textContent = this.totalAttacksCount.toLocaleString();
     this.hudActiveOrigins.textContent = `${this.countryStats.size} REGIONS`;
     this.updateLeaderboards();
+    this.renderPinnedNodesLegend();
 
     await this.checkExistingSession();
     await this.loadCartography();
@@ -258,11 +248,17 @@ export class ThreatMap {
   matchesFilterBucket(bucket) {
     return this.feedController.matchesFilterBucket(bucket);
   }
+  matchesPinnedIp(data) {
+    return this.feedController.matchesPinnedIp(data);
+  }
   matchesSearchQuery(data) {
     return this.feedController.matchesSearchQuery(data);
   }
   matchesActiveFilters(data) {
     return this.feedController.matchesActiveFilters(data);
+  }
+  togglePinnedIpFilter() {
+    this.feedController.togglePinnedIpFilter();
   }
   toggleStreamPause() {
     this.feedController.toggleStreamPause();
@@ -324,15 +320,6 @@ export class ThreatMap {
   updateUserHeaderUI() {
     this.authController.updateUserHeaderUI();
   }
-  openModalSection(section) {
-    this.authController.openModalSection(section);
-  }
-  renderCustomSourcesList() {
-    this.authController.renderCustomSourcesList();
-  }
-  saveCustomSources(sourcesArray) {
-    return this.authController.saveCustomSources(sourcesArray);
-  }
   bindAuthEvents() {
     this.authController.bindAuthEvents();
   }
@@ -355,6 +342,12 @@ export class ThreatMap {
   }
   drawCityBadge(x, y, text, borderColor, dotColor) {
     this.mapRenderer.drawCityBadge(x, y, text, borderColor, dotColor);
+  }
+  renderCustomLocations() {
+    this.mapRenderer.renderCustomLocations();
+  }
+  renderPinnedNodesLegend() {
+    this.mapRenderer.renderPinnedNodesLegend();
   }
   drawCyberOceanBackdrop(width, height) {
     this.mapRenderer.drawCyberOceanBackdrop(width, height);
@@ -386,6 +379,48 @@ export class ThreatMap {
     data._id = attackId;
     data._bucket = bucket;
     data._timestamp = new Date().toTimeString().split(" ")[0] + " UTC";
+
+    // Strict IP-based matching: a pinned node is under attack ONLY when its
+    // configured IP address matches the attack telemetry's destination (or source) IP.
+    const normalizeIp = (val) => String(val || "").trim().split(":")[0];
+    const dstIp = normalizeIp(data.dstIp);
+    const srcIp = normalizeIp(data.srcIp);
+
+    let matchedLoc = null;
+    if (this.customLocations && this.customLocations.length > 0) {
+      const matchingLocs = this.customLocations.filter((loc) => {
+        const locIp = normalizeIp(loc.ip);
+        return (
+          locIp &&
+          locIp !== "N/A" &&
+          (locIp === dstIp || locIp === srcIp)
+        );
+      });
+
+      if (matchingLocs.length > 0) {
+        matchedLoc = matchingLocs[0];
+        data._matchesPinnedIp = true;
+        const until = performance.now() + 6500;
+        matchingLocs.forEach((loc) => {
+          loc._underAttackUntil = until;
+        });
+
+        // If the pinned IP is the destination target, align the arc endpoint to the pin's coordinates
+        if (
+          normalizeIp(matchedLoc.ip) === dstIp &&
+          Number.isFinite(Number(matchedLoc.lat)) &&
+          Number.isFinite(Number(matchedLoc.lon))
+        ) {
+          data.dstLat = Number(matchedLoc.lat);
+          data.dstLon = Number(matchedLoc.lon);
+          data.dstCity = matchedLoc.name || data.dstCity;
+          data.dstCountry = matchedLoc.country || data.dstCountry;
+          if (matchedLoc.code && matchedLoc.code !== "un") {
+            data.dstCode = matchedLoc.code;
+          }
+        }
+      }
+    }
 
     this.rawAttackBuffer.unshift(data);
     if (this.rawAttackBuffer.length > 250) this.rawAttackBuffer.pop();
@@ -425,6 +460,8 @@ export class ThreatMap {
       color: arcColor,
       bucket: bucket,
       trailLength: 0.16,
+      targetLocationKey: matchedLoc ? matchedLoc.id || matchedLoc.name : null,
+      targetIp: matchedLoc ? normalizeIp(matchedLoc.ip) : null,
       cityName:
         data.srcCity && data.srcCity !== "Unknown"
           ? data.srcCity

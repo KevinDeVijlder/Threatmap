@@ -1,8 +1,9 @@
 """
 SQLite Database Layer
 =====================
-Handles schema initialization, password hashing, session token lookup,
-and user profile persistence.
+Handles schema initialization, automatic migrations, password hashing,
+session token lookup, and user profile persistence (avatars, custom feeds,
+and monitored map locations).
 """
 
 import hashlib
@@ -10,7 +11,7 @@ import json
 import secrets
 import sqlite3
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from config import DB_PATH, logger
 
@@ -23,7 +24,7 @@ def get_db_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Creates the SQLite database tables for users and sessions if they do not exist."""
+    """Creates the SQLite database tables for users and sessions if they do not exist, and runs migrations."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
@@ -34,6 +35,7 @@ def init_db() -> None:
             salt TEXT NOT NULL,
             avatar TEXT DEFAULT '',
             custom_sources TEXT DEFAULT '[]',
+            custom_locations TEXT DEFAULT '[]',
             created_at REAL NOT NULL
         )
     """)
@@ -45,6 +47,14 @@ def init_db() -> None:
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     """)
+
+    # Safe schema migration for existing databases created before custom_locations was added
+    cursor.execute("PRAGMA table_info(users)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+    if "custom_locations" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN custom_locations TEXT DEFAULT '[]'")
+        logger.info("Migrated SQLite 'users' table to include 'custom_locations' column.")
+
     conn.commit()
     conn.close()
     logger.info(f"SQLite database initialized at {DB_PATH}")
@@ -64,7 +74,7 @@ def get_user_by_raw_token(token: Optional[str]) -> Optional[Dict]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT u.id, u.username, u.avatar, u.custom_sources
+        SELECT u.id, u.username, u.avatar, u.custom_sources, u.custom_locations
         FROM sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token = ?
@@ -78,6 +88,7 @@ def get_user_by_raw_token(token: Optional[str]) -> Optional[Dict]:
         "username": row["username"],
         "avatar": row["avatar"] or "",
         "custom_sources": json.loads(row["custom_sources"] or "[]"),
+        "custom_locations": json.loads(row["custom_locations"] or "[]"),
     }
 
 
@@ -101,6 +112,18 @@ def get_user_custom_sources(user_id: int) -> List[Dict]:
     return json.loads(row["custom_sources"] or "[]")
 
 
+def get_user_custom_locations(user_id: int) -> List[Dict]:
+    """Fetches the latest custom_locations list for a specific user_id from SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT custom_locations FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return []
+    return json.loads(row["custom_locations"] or "[]")
+
+
 def create_user_and_session(username: str, password: str, avatar: str = "") -> Tuple[str, Dict]:
     """Creates a new user account and an initial session token. Raises sqlite3.IntegrityError if duplicate."""
     salt = secrets.token_hex(16)
@@ -111,8 +134,8 @@ def create_user_and_session(username: str, password: str, avatar: str = "") -> T
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users (username, password_hash, salt, avatar, custom_sources, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (username, pwd_hash, salt, avatar or "", "[]", now),
+            "INSERT INTO users (username, password_hash, salt, avatar, custom_sources, custom_locations, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (username, pwd_hash, salt, avatar or "", "[]", "[]", now),
         )
         user_id = cursor.lastrowid
         token = secrets.token_urlsafe(32)
@@ -129,6 +152,7 @@ def create_user_and_session(username: str, password: str, avatar: str = "") -> T
         "username": username,
         "avatar": avatar or "",
         "custom_sources": [],
+        "custom_locations": [],
     }
     return token, user_dict
 
@@ -157,6 +181,7 @@ def authenticate_user(username: str, password: str) -> Optional[Tuple[str, Dict]
         "username": row["username"],
         "avatar": row["avatar"] or "",
         "custom_sources": json.loads(row["custom_sources"] or "[]"),
+        "custom_locations": json.loads(row["custom_locations"] or "[]"),
     }
     return token, user_dict
 
@@ -176,6 +201,16 @@ def update_user_sources(user_id: int, custom_sources: List[Dict[str, str]]) -> N
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET custom_sources = ? WHERE id = ?", (sources_json, user_id))
+    conn.commit()
+    conn.close()
+
+
+def update_user_locations(user_id: int, custom_locations: List[Dict[str, Any]]) -> None:
+    """Updates the JSON-serialized custom monitored locations for a user."""
+    locations_json = json.dumps(custom_locations)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET custom_locations = ? WHERE id = ?", (locations_json, user_id))
     conn.commit()
     conn.close()
 

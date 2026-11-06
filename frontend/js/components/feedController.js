@@ -18,6 +18,26 @@ export class FeedController {
     return bucket === this.app.currentSeverityFilter;
   }
 
+  /**
+   * Checks whether an attack telemetry event's destination IP (or source IP)
+   * matches any of the user's pinned IP addresses.
+   */
+  matchesPinnedIp(data) {
+    if (!data) return false;
+    if (data._matchesPinnedIp) return true;
+    const locations = this.app.customLocations || [];
+    if (locations.length === 0) return false;
+
+    const normalizeIp = (val) => String(val || "").trim().split(":")[0];
+    const dstIp = normalizeIp(data.dstIp);
+    const srcIp = normalizeIp(data.srcIp);
+
+    return locations.some((loc) => {
+      const locIp = normalizeIp(loc.ip);
+      return locIp && locIp !== "N/A" && (locIp === dstIp || locIp === srcIp);
+    });
+  }
+
   matchesSearchQuery(data) {
     if (!this.app.searchQuery) return true;
     const q = this.app.searchQuery.toLowerCase();
@@ -29,6 +49,7 @@ export class FeedController {
       data.srcCountry,
       data.srcCode,
       data.srcAsn,
+      data.dstIp,
       data.dstCity,
       data.dstCountry,
       data.dstCode,
@@ -46,7 +67,34 @@ export class FeedController {
   matchesActiveFilters(data) {
     if (!data) return false;
     const bucket = data._bucket || resolveSeverityBucket(data);
-    return this.matchesFilterBucket(bucket) && this.matchesSearchQuery(data);
+    if (!this.matchesFilterBucket(bucket)) return false;
+    if (this.app.onlyPinnedFilter && !this.matchesPinnedIp(data)) return false;
+    return this.matchesSearchQuery(data);
+  }
+
+  togglePinnedIpFilter() {
+    this.app.onlyPinnedFilter = !this.app.onlyPinnedFilter;
+    const isActive = this.app.onlyPinnedFilter;
+
+    if (this.app.btnFilterPinned) {
+      this.app.btnFilterPinned.classList.toggle("active", isActive);
+    }
+    if (this.app.pinnedFilterBadge) {
+      this.app.pinnedFilterBadge.textContent = isActive ? "ON" : "OFF";
+    }
+    if (this.app.btnHudFilterPinned) {
+      this.app.btnHudFilterPinned.classList.toggle("active", isActive);
+    }
+
+    if (
+      this.app.selectedAttack &&
+      !this.matchesActiveFilters(this.app.selectedAttack)
+    ) {
+      this.app.selectedAttack = null;
+      this.app.updateAttackDossier();
+    }
+
+    this.rebuildTickerFromBuffer();
   }
 
   toggleStreamPause() {
@@ -136,7 +184,16 @@ export class FeedController {
   }
 
   rebuildTickerFromBuffer() {
-    this.app.attackTicker.innerHTML = `<div class="ticker-empty">NO MATCHING INTRUSIONS IN BUFFER...</div>`;
+    if (this.app.onlyPinnedFilter) {
+      const hasPins =
+        this.app.customLocations && this.app.customLocations.length > 0;
+      this.app.attackTicker.innerHTML = hasPins
+        ? `<div class="ticker-empty">WAITING FOR THREAT INTEL AGAINST PINNED IPs...</div>`
+        : `<div class="ticker-empty">NO PINNED IPs CONFIGURED YET.<br/>ADD AN IP IN SETTINGS TO MONITOR.</div>`;
+    } else {
+      this.app.attackTicker.innerHTML = `<div class="ticker-empty">NO MATCHING INTRUSIONS IN BUFFER...</div>`;
+    }
+
     const filtered = this.app.rawAttackBuffer.filter((data) =>
       this.matchesActiveFilters(data)
     );
@@ -286,6 +343,18 @@ export class FeedController {
     if (this.app.btnPauseStream) {
       this.app.btnPauseStream.addEventListener("click", () => {
         this.toggleStreamPause();
+      });
+    }
+
+    // Pinned IPs Only Filter Toggle Buttons (Sidebar + Map Legend HUD)
+    if (this.app.btnFilterPinned) {
+      this.app.btnFilterPinned.addEventListener("click", () => {
+        this.togglePinnedIpFilter();
+      });
+    }
+    if (this.app.btnHudFilterPinned) {
+      this.app.btnHudFilterPinned.addEventListener("click", () => {
+        this.togglePinnedIpFilter();
       });
     }
 

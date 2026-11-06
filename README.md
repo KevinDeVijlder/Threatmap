@@ -49,16 +49,17 @@ soc-threat-map/
 │   │   ├── header.css                # Top telemetry HUD, mode switcher & cursor tooltip
 │   │   ├── sidebar-left.css          # Intrusion feed, controls, search & country bar
 │   │   ├── sidebar-right.css         # Top 10 leaderboards, country & attack dossiers
-│   │   └── modal.css                 # Operator authentication & custom feeds modal
+│   │   ├── modal.css                 # Shared form, tab & card input styles
+│   │   └── pages.css                 # Standalone Login/Register & Configuration page styles
 │   ├── data/
 │   │   └── countries-110m.json       # Natural Earth TopoJSON vector dataset
 │   ├── js/
 │   │   ├── components/
-│   │   │   ├── authController.js     # Auth, operator profile & custom feed CRUD
+│   │   │   ├── authController.js     # Session state & navigation to Login/Settings pages
 │   │   │   ├── dossierController.js  # Country & attack dossiers, OSINT pivots & IOC copy
 │   │   │   ├── feedController.js     # Live ticker, filter, search, pause & JSON/CSV export
 │   │   │   ├── leaderboardController.js # Dual Top 10 leaderboards & localStorage stats
-│   │   │   └── mapRenderer.js        # 2D vector map, RGB hit-mask & ballistic arcs
+│   │   │   └── mapRenderer.js        # 2D vector map, custom city icons & ballistic arcs
 │   │   ├── data/
 │   │   │   └── countries.js          # ISO 3166-1 country lookup & metadata resolver
 │   │   ├── services/
@@ -67,13 +68,17 @@ soc-threat-map/
 │   │   │   ├── helpers.js            # Severity bucket, Bezier math & Haversine utilities
 │   │   │   └── partialLoader.js      # HTML partial template loader
 │   │   ├── config.js                 # Frontend canvas, color & endpoint configuration
-│   │   └── main.js                   # Main ThreatMap application orchestrator
+│   │   ├── main.js                   # Main ThreatMap application orchestrator
+│   │   ├── login.js                  # Standalone Login / Register page controller
+│   │   └── settings.js               # Standalone Custom Feeds & Map Locations controller
 │   ├── partials/
 │   │   ├── header.html               # Top telemetry HUD & operator profile menu
 │   │   ├── sidebar-left.html         # Real-time intrusion feed & country intel bar
-│   │   ├── sidebar-right.html        # Dual Top 10 leaderboards & intelligence dossiers
-│   │   └── modal.html                # Operator authentication & custom feeds modal
-│   └── index.html                    # Main SOC dashboard shell
+│   │   └── sidebar-right.html        # Dual Top 10 leaderboards & intelligence dossiers
+│   ├── index.html                    # Main SOC Threat Map dashboard
+│   ├── login.html                    # Dedicated Operator Login & Registration page
+│   └── settings.html                 # Dedicated Custom Feeds & Monitored Map Locations page
+├── index.html                        # Root entry point (forwards to frontend/index.html)
 ├── .gitignore
 └── README.md
 ```

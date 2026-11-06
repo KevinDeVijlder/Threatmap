@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operator Authentication // Threat Map</title>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/x-icon" href="../favicon.png">
+</head>
+<body class="subpage-body">
+  <!-- Top Tactical Navigation Bar -->
+  <header class="subpage-header">
+    <a href="index.html" class="subpage-brand">
+      <div class="subpage-brand-icon">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div class="subpage-brand-text">
+        <span class="subpage-brand-title">SOC THREAT MATRIX</span>
+        <span class="subpage-brand-sub">OPERATOR ACCESS TERMINAL</span>
+      </div>
+    </a>
+
+    <div class="subpage-nav-actions">
+      <a href="index.html" class="nav-action-btn">
+        <i class="fa-solid fa-earth-americas"></i>
+        <span>RETURN TO THREAT MAP</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="auth-page-container">
+    <section class="auth-page-card">
+      <div class="auth-card-header">
+        <span id="auth-page-title" class="auth-card-title">SOC OPERATOR AUTHENTICATION</span>
+        <span class="auth-card-badge">PBKDF2-SHA256</span>
+      </div>
+
+      <!-- View 1: Login / Register Form (Shown when logged out) -->
+      <div id="auth-form-section" class="auth-card-body">
+        <div class="auth-tabs">
+          <button id="tab-login" class="auth-tab active" type="button">LOGIN</button>
+          <button id="tab-register" class="auth-tab" type="button">REGISTER</button>
+        </div>
+
+        <form id="auth-form" class="auth-form">
+          <div class="form-group">
+            <label for="auth-username">OPERATOR CALLSIGN (USERNAME)</label>
+            <input id="auth-username" type="text" placeholder="e.g. SOC_ANALYST_01" required autocomplete="username" />
+          </div>
+
+          <div class="form-group">
+            <label for="auth-password">SECURITY PASSKEY</label>
+            <input id="auth-password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+
+          <div id="register-avatar-group" class="form-group" style="display: none;">
+            <label>OPERATOR PROFILE ICON (OPTIONAL)</label>
+            <div class="avatar-upload-row">
+              <div class="avatar-preview-box">
+                <img id="reg-avatar-preview" src="" alt="Preview" style="display: none;" />
+                <span id="reg-avatar-placeholder"><i class="fa-solid fa-user-astronaut"></i></span>
+              </div>
+              <label class="file-upload-btn">
+                <i class="fa-solid fa-upload"></i> UPLOAD AVATAR
+                <input id="reg-avatar-input" type="file" accept="image/*" hidden />
+              </label>
+            </div>
+          </div>
+
+          <div id="auth-error" class="auth-error" style="display: none;"></div>
+          <div id="auth-success" class="auth-success-msg"></div>
+
+          <button id="btn-auth-submit" class="modal-primary-btn" type="submit">AUTHENTICATE SESSION</button>
+        </form>
+      </div>
+
+      <!-- View 2: Active Operator Session Summary (Shown if already logged in) -->
+      <div id="auth-logged-in-section" class="auth-card-body" style="display: none;">
+        <div class="profile-summary">
+          <div class="avatar-preview-box large">
+            <img id="active-avatar-preview" src="" alt="Operator Avatar" style="display: none;" />
+            <span id="active-avatar-placeholder"><i class="fa-solid fa-user-astronaut"></i></span>
+          </div>
+          <div class="profile-meta">
+            <span class="profile-callsign" id="active-username-display">OPERATOR</span>
+            <span class="profile-status-tag">ACTIVE AUTHENTICATED SESSION</span>
+          </div>
+        </div>
+
+        <a href="settings.html" class="modal-primary-btn" style="text-align: center; text-decoration: none;">
+          <i class="fa-solid fa-satellite-dish"></i> CONFIGURE FEEDS &amp; MAP LOCATIONS
+        </a>
+
+        <a href="index.html" class="nav-action-btn" style="justify-content: center;">
+          <i class="fa-solid fa-earth-americas"></i> LAUNCH LIVE THREAT MAP
+        </a>
+
+        <button id="btn-page-logout" class="nav-action-btn danger" type="button" style="justify-content: center;">
+          <i class="fa-solid fa-right-from-bracket"></i> TERMINATE SESSION (LOGOUT)
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

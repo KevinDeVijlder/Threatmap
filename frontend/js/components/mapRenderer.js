@@ -1,17 +1,21 @@
 /**
- * 2D Vector Map & Ballistic Trajectory Renderer
- * =============================================
+ * 2D Vector Map, Monitored City Markers & Ballistic Trajectory Renderer
+ * =====================================================================
  * Handles TopoJSON cartography loading, D3 Equirectangular projection,
  * offscreen RGB hit-mask country picking, ocean grid backdrop, country
- * illumination, shockwave ripples, and quadratic Bezier attack trajectories.
+ * illumination, pinned custom city icons with labels underneath,
+ * shockwave ripples, and quadratic Bezier attack trajectories.
  */
 
 import { CONFIG } from "../config.js";
-import { getBezierPoint, getBucketColor } from "../utils/helpers.js";
+import { getBezierPoint, getBucketColor, getPinTypeMeta } from "../utils/helpers.js";
 
 export class MapRenderer {
   constructor(app) {
     this.app = app;
+    this.lastMouseX = -1;
+    this.lastMouseY = -1;
+    this.lastAlarmSignature = "";
   }
 
   async loadCartography() {
@@ -193,6 +197,307 @@ export class MapRenderer {
     ctx.shadowBlur = 0;
     ctx.textBaseline = "middle";
     ctx.fillText(labelText, labelX + 17, labelY + labelH / 2 + 0.5);
+  }
+
+  /**
+   * Draws a minimalistic vector icon inside a map pin badge as a fallback
+   * if the Font Awesome webfont is still loading.
+   */
+  drawFallbackPinGlyph(ctx, key, x, y) {
+    ctx.beginPath();
+    if (key === "SOC_CORE") {
+      // Minimalistic Shield
+      ctx.moveTo(x, y - 6);
+      ctx.lineTo(x + 5, y - 4);
+      ctx.lineTo(x + 5, y + 1);
+      ctx.quadraticCurveTo(x + 4, y + 5, x, y + 6.5);
+      ctx.quadraticCurveTo(x - 4, y + 5, x - 5, y + 1);
+      ctx.lineTo(x - 5, y - 4);
+      ctx.closePath();
+      ctx.fill();
+    } else if (key === "SENSOR") {
+      // Minimalistic Satellite Dish / Radar Arc
+      ctx.arc(x - 1, y + 1, 5, Math.PI * 0.75, Math.PI * 1.75);
+      ctx.lineTo(x - 1, y + 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(x - 3, y + 4.5, 5, 1.5);
+    } else if (key === "HIGH_VALUE") {
+      // Minimalistic Crown
+      ctx.moveTo(x - 5.5, y + 4);
+      ctx.lineTo(x - 5.5, y - 3);
+      ctx.lineTo(x - 2, y + 0.5);
+      ctx.lineTo(x, y - 4.5);
+      ctx.lineTo(x + 2, y + 0.5);
+      ctx.lineTo(x + 5.5, y - 3);
+      ctx.lineTo(x + 5.5, y + 4);
+      ctx.closePath();
+      ctx.fill();
+    } else if (key === "HONEYPOT") {
+      // Minimalistic Bug
+      ctx.arc(x, y + 0.5, 3.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(x - 6, y - 1.5, 12, 1.2);
+      ctx.fillRect(x - 6, y + 1.5, 12, 1.2);
+    } else {
+      // Default City Skyline
+      ctx.fillRect(x - 6, y - 2, 3.5, 7);
+      ctx.fillRect(x - 2, y - 6, 4.5, 11);
+      ctx.fillRect(x + 3, y, 3.2, 5);
+    }
+  }
+
+  /**
+   * Checks whether a specific pinned location's IP address is currently
+   * under attack by an in-flight trajectory or recent impact shockwave.
+   */
+  isLocationUnderAttack(loc, now = performance.now()) {
+    if (!loc || !loc.ip) return false;
+    const locIp = String(loc.ip || "")
+      .trim()
+      .split(":")[0];
+    if (!locIp || locIp === "N/A") return false;
+
+    if (loc._underAttackUntil && now < loc._underAttackUntil) {
+      return true;
+    }
+    return this.app.attacks.some(
+      (atk) => atk.targetIp && atk.targetIp === locIp
+    );
+  }
+
+  /**
+   * Renders the floating Pinned Locations Legend DOM list on the map.
+   */
+  renderPinnedNodesLegend() {
+    if (!this.app.pinnedNodesList) return;
+    const locations = this.app.customLocations || [];
+
+    if (locations.length === 0) {
+      this.app.pinnedNodesList.innerHTML = `
+        <div class="pinned-nodes-empty">
+          No nodes pinned. <a href="settings.html#locations">Add in Settings →</a>
+        </div>
+      `;
+      this.lastAlarmSignature = "";
+      this.updatePinnedNodesAlarmDOM(performance.now());
+      return;
+    }
+
+    this.app.pinnedNodesList.innerHTML = locations
+      .map((loc, idx) => {
+        const pinMeta = getPinTypeMeta(loc.color);
+        const accent = pinMeta.color;
+        const locKey = loc.id || loc.name || `node_${idx}`;
+        const ipDisplay = loc.ip ? `${loc.ip} • ` : "";
+        return `
+          <div class="pinned-node-row" data-node-key="${locKey}" style="border-left-color: ${accent};">
+            <div class="pinned-node-left">
+              <div class="pinned-node-icon-box" style="color: ${accent}; border-color: ${accent};">
+                <i class="fa-solid ${pinMeta.faClass}"></i>
+              </div>
+              <div class="pinned-node-meta">
+                <span class="pinned-node-name">${(loc.name || "NODE").toUpperCase()}</span>
+                <span class="pinned-node-type" style="color: ${accent};">${ipDisplay}${pinMeta.label}</span>
+              </div>
+            </div>
+            <div class="pinned-node-status nominal">
+              <span class="status-dot"></span>
+              <span class="status-text">OK</span>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    this.lastAlarmSignature = "";
+    this.updatePinnedNodesAlarmDOM(performance.now());
+  }
+
+  /**
+   * Synchronizes the flashing alarm indicator and per-node alert badges
+   * whenever a pinned location enters or leaves the under-attack state.
+   */
+  updatePinnedNodesAlarmDOM(now = performance.now()) {
+    if (!this.app.pinnedAlarmIndicator || !this.app.pinnedNodesHud) return;
+    const locations = this.app.customLocations || [];
+
+    const attackedNodes = locations.filter((loc) =>
+      this.isLocationUnderAttack(loc, now)
+    );
+    const sig = attackedNodes.map((l) => l.id || l.name).join("|");
+    if (sig === this.lastAlarmSignature) return;
+    this.lastAlarmSignature = sig;
+
+    const isAnyUnderAttack = attackedNodes.length > 0;
+    this.app.pinnedNodesHud.classList.toggle("under-attack", isAnyUnderAttack);
+    this.app.pinnedAlarmIndicator.classList.toggle("alarm-active", isAnyUnderAttack);
+    this.app.pinnedAlarmIndicator.classList.toggle("standby", !isAnyUnderAttack);
+
+    if (isAnyUnderAttack) {
+      const primaryName = (attackedNodes[0].name || "NODE").toUpperCase();
+      const extraCount =
+        attackedNodes.length > 1 ? ` +${attackedNodes.length - 1}` : "";
+      this.app.pinnedAlarmText.textContent = `ALARM: ${primaryName}${extraCount}`;
+    } else {
+      this.app.pinnedAlarmText.textContent =
+        locations.length > 0 ? "PERIMETER SECURE" : "STANDBY";
+    }
+
+    if (this.app.pinnedNodesList) {
+      const attackedKeys = new Set(attackedNodes.map((l) => l.id || l.name));
+      this.app.pinnedNodesList
+        .querySelectorAll(".pinned-node-row")
+        .forEach((row) => {
+          const key = row.dataset.nodeKey;
+          const underAtk = attackedKeys.has(key);
+          row.classList.toggle("node-under-attack", underAtk);
+          const statusEl = row.querySelector(".pinned-node-status");
+          if (statusEl) {
+            if (underAtk) {
+              statusEl.className = "pinned-node-status alert";
+              statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span>HIT</span>`;
+            } else {
+              statusEl.className = "pinned-node-status nominal";
+              statusEl.innerHTML = `<span class="status-dot"></span><span class="status-text">OK</span>`;
+            }
+          }
+        });
+    }
+  }
+
+  /**
+   * Renders operator-configured custom locations onto the map with a
+   * category-specific Font Awesome icon and the configured Name underneath.
+   */
+  renderCustomLocations() {
+    const now = performance.now();
+    this.updatePinnedNodesAlarmDOM(now);
+
+    if (
+      !this.app.projection ||
+      !this.app.customLocations ||
+      this.app.customLocations.length === 0
+    ) {
+      return;
+    }
+
+    const ctx = this.app.ctx;
+    const faLoaded =
+      document.fonts &&
+      document.fonts.check('900 12px "Font Awesome 6 Free"');
+
+    for (const loc of this.app.customLocations) {
+      const lon = parseFloat(loc.lon);
+      const lat = parseFloat(loc.lat);
+      if (Number.isNaN(lon) || Number.isNaN(lat)) continue;
+
+      const pt = this.app.projection([lon, lat]);
+      if (!pt) continue;
+
+      const [x, y] = pt;
+      const pinMeta = getPinTypeMeta(loc.color);
+      const underAttack = this.isLocationUnderAttack(loc, now);
+      const accent = underAttack ? CONFIG.colorHigh : pinMeta.color;
+      const labelText = (loc.name || "CITY NODE").toUpperCase();
+      const isHovered =
+        Math.hypot(this.lastMouseX - x, this.lastMouseY - y) <= 22;
+
+      ctx.save();
+
+      // 1. Subtle breathing radar ring (or rapid flashing red alarm ring if under attack)
+      if (underAttack) {
+        const alarmPulse = 16 + ((now * 0.025) % 14);
+        ctx.strokeStyle = CONFIG.colorHigh;
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.arc(x, y, alarmPulse, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const pulseRadius = 15 + Math.sin(now * 0.004) * 3;
+        ctx.strokeStyle = accent;
+        ctx.globalAlpha = isHovered ? 0.65 : 0.35;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(x, y, pulseRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 2. Dark-glass circular badge housing the category icon
+      const iconBoxRadius = 12;
+      ctx.globalAlpha = 0.96;
+      ctx.fillStyle = "rgba(5, 13, 28, 0.94)";
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = isHovered ? 2.0 : 1.5;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = isHovered ? 16 : 10;
+      ctx.beginPath();
+      ctx.arc(x, y, iconBoxRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 3. Category-Specific Font Awesome Icon inside the badge
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = accent;
+      if (faLoaded) {
+        ctx.font = '900 11.5px "Font Awesome 6 Free"';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pinMeta.unicode, x, y + 0.5);
+      } else {
+        this.drawFallbackPinGlyph(ctx, pinMeta.key, x, y);
+      }
+
+      // 4. Nameplate Label Centered Directly Underneath the Icon
+      ctx.font = "700 10.5px JetBrains Mono, monospace";
+      const nameMetrics = ctx.measureText(labelText);
+      const pillW = nameMetrics.width + 14;
+      const pillH = 18;
+      const pillX = x - pillW / 2;
+      const pillY = y + iconBoxRadius + 4;
+
+      ctx.fillStyle = "rgba(5, 13, 28, 0.92)";
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.1;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 0;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(labelText, x, pillY + pillH / 2 + 0.5);
+
+      // 5. Hover detail badge (Category + IP + City) underneath the name
+      if (isHovered && loc.ip) {
+        const subText = `${pinMeta.label} • IP: ${loc.ip}${
+          loc.city ? ` • ${loc.city.toUpperCase()}` : ""
+        }`;
+        ctx.font = "600 9.5px JetBrains Mono, monospace";
+        const subW = ctx.measureText(subText).width + 12;
+        const subH = 16;
+        const subX = x - subW / 2;
+        const subY = pillY + pillH + 3;
+
+        ctx.fillStyle = "rgba(3, 8, 20, 0.95)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(subX, subY, subW, subH, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = accent;
+        ctx.fillText(subText, x, subY + subH / 2 + 0.5);
+      }
+
+      ctx.restore();
+    }
   }
 
   drawCyberOceanBackdrop(width, height) {
@@ -516,6 +821,9 @@ export class MapRenderer {
       }
     }
 
+    // Render pinned custom locations (City Icon + Name underneath)
+    this.renderCustomLocations();
+
     this.renderAttacks();
   }
 
@@ -552,6 +860,8 @@ export class MapRenderer {
       const rect = this.app.canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
+      this.lastMouseX = mouseX;
+      this.lastMouseY = mouseY;
 
       if (this.app.projection) {
         const coords = this.app.projection.invert([mouseX, mouseY]);
@@ -577,6 +887,8 @@ export class MapRenderer {
     });
 
     this.app.canvas.addEventListener("mouseleave", () => {
+      this.lastMouseX = -1;
+      this.lastMouseY = -1;
       this.app.hoveredCountryIndex = null;
       this.app.updateHoverIntel(null, 0, 0);
     });

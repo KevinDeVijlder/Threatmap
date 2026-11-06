@@ -1,12 +1,12 @@
 /**
- * Authentication, Profile & Custom OSINT Feeds Controller
- * =======================================================
- * Handles operator login/registration, session persistence, profile avatar
- * updates, custom feed CRUD, and switching between 'live' and 'custom' modes.
+ * Authentication & Header Navigation Controller (Map Dashboard)
+ * =============================================================
+ * Verifies active operator session on the Threat Map, syncs custom monitored
+ * locations, updates the top-right operator menu, and routes to the dedicated
+ * `login.html` and `settings.html` pages.
  */
 
 import { CONFIG } from "../config.js";
-import { fileToDataUrl } from "../utils/helpers.js";
 
 export class AuthController {
   constructor(app) {
@@ -14,7 +14,10 @@ export class AuthController {
   }
 
   switchFeedMode(mode) {
-    if (mode === "custom" && !this.app.currentUser) return;
+    if (mode === "custom" && !this.app.currentUser) {
+      window.location.href = "login.html?redirect=settings.html";
+      return;
+    }
 
     this.app.activeFeedMode = mode;
     this.app.attacks = [];
@@ -42,7 +45,7 @@ export class AuthController {
       const hasSources = (this.app.currentUser.custom_sources || []).length > 0;
       this.app.attackTicker.innerHTML = hasSources
         ? `<div class="ticker-empty">STREAMING FROM YOUR CUSTOM FEEDS...</div>`
-        : `<div class="ticker-empty">NO CUSTOM FEEDS ADDED YET.<br/>OPEN CUSTOM FEED SETTINGS TO ADD SOURCES.</div>`;
+        : `<div class="ticker-empty">NO CUSTOM FEEDS ADDED YET.<br/><a href="settings.html#feeds" style="color: var(--color-accent);">OPEN CONFIGURATION PAGE TO ADD SOURCES →</a></div>`;
     }
 
     this.app.socketService.sendModeUpdate();
@@ -50,7 +53,9 @@ export class AuthController {
 
   async checkExistingSession() {
     if (!this.app.authToken) {
+      this.app.customLocations = [];
       this.updateUserHeaderUI();
+      this.app.renderPinnedNodesLegend();
       return;
     }
     try {
@@ -60,12 +65,20 @@ export class AuthController {
       if (res.ok) {
         const data = await res.json();
         this.app.currentUser = data.user;
+        this.app.customLocations = data.user.custom_locations || [];
+        localStorage.setItem(
+          "soc_custom_locations",
+          JSON.stringify(this.app.customLocations)
+        );
       } else {
         this.app.authToken = null;
+        this.app.customLocations = [];
         localStorage.removeItem("soc_auth_token");
+        localStorage.removeItem("soc_custom_locations");
       }
     } catch {}
     this.updateUserHeaderUI();
+    this.app.renderPinnedNodesLegend();
   }
 
   updateUserHeaderUI() {
@@ -79,7 +92,7 @@ export class AuthController {
 
       this.app.dropdownUserStatus.textContent = `OPERATOR // ${this.app.currentUser.username.toUpperCase()}`;
       this.app.menuIconAccount.className = "fa-solid fa-user-gear";
-      this.app.menuTextAccount.textContent = "ACCOUNT SETTINGS";
+      this.app.menuTextAccount.textContent = "OPERATOR SETTINGS";
       this.app.menuBtnFeeds.classList.remove("disabled");
       this.app.menuBtnLogout.classList.remove("disabled");
 
@@ -87,21 +100,10 @@ export class AuthController {
         this.app.userAvatarImg.src = this.app.currentUser.avatar;
         this.app.userAvatarImg.style.display = "block";
         this.app.userDefaultIcon.style.display = "none";
-
-        this.app.profileAvatarPreview.src = this.app.currentUser.avatar;
-        this.app.profileAvatarPreview.style.display = "block";
-        this.app.profileAvatarPlaceholder.style.display = "none";
       } else {
         this.app.userAvatarImg.style.display = "none";
         this.app.userDefaultIcon.style.display = "block";
-
-        this.app.profileAvatarPreview.style.display = "none";
-        this.app.profileAvatarPlaceholder.style.display = "block";
       }
-
-      this.app.profileUsernameDisplay.textContent =
-        this.app.currentUser.username.toUpperCase();
-      this.renderCustomSourcesList();
     } else {
       this.app.customModeWrapper.classList.add("locked");
       this.app.btnModeCustom.classList.add("locked");
@@ -123,82 +125,37 @@ export class AuthController {
     }
   }
 
-  openModalSection(section) {
-    this.app.authError.style.display = "none";
-    this.app.modalAuthView.style.display = "none";
-    this.app.modalAccountView.style.display = "none";
-    this.app.modalFeedsView.style.display = "none";
-
-    if (!this.app.currentUser || section === "auth") {
-      this.app.modalTitle.textContent = "SOC OPERATOR AUTHENTICATION";
-      this.app.modalAuthView.style.display = "flex";
-    } else if (section === "account") {
-      this.app.modalTitle.textContent = "ACCOUNT SETTINGS";
-      this.app.modalAccountView.style.display = "flex";
-    } else if (section === "feeds") {
-      this.app.modalTitle.textContent = "CUSTOM FEED SETTINGS";
-      this.app.modalFeedsView.style.display = "flex";
-    }
-    this.app.userModalBackdrop.style.display = "flex";
-  }
-
-  renderCustomSourcesList() {
-    if (!this.app.currentUser) return;
-    const sources = this.app.currentUser.custom_sources || [];
-    if (sources.length === 0) {
-      this.app.customSourcesList.innerHTML = `<div class="ticker-empty">NO CUSTOM FEEDS CONFIGURED YET</div>`;
-      return;
-    }
-    this.app.customSourcesList.innerHTML = sources
-      .map(
-        (s, idx) => `
-        <div class="source-item">
-          <div class="source-item-meta">
-            <span class="source-item-name">${s.name}</span>
-            <span class="source-item-url">${s.url}</span>
-          </div>
-          <button class="source-del-btn" data-idx="${idx}" type="button">✕</button>
-        </div>
-      `
-      )
-      .join("");
-  }
-
-  async saveCustomSources(sourcesArray) {
-    if (!this.app.authToken) return;
-    const res = await fetch(`${CONFIG.apiBase}/api/profile/sources`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.app.authToken}`,
-      },
-      body: JSON.stringify({ custom_sources: sourcesArray }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      this.app.currentUser = data.user;
-      this.renderCustomSourcesList();
-      if (this.app.activeFeedMode === "custom") {
-        this.switchFeedMode("custom");
-      }
-    }
-  }
-
   bindAuthEvents() {
     this.app.btnModeLive.addEventListener("click", () => {
       this.switchFeedMode("live");
     });
+
     this.app.btnModeCustom.addEventListener("click", () => {
-      if (this.app.currentUser) this.switchFeedMode("custom");
+      if (this.app.currentUser) {
+        this.switchFeedMode("custom");
+      } else {
+        window.location.href = "login.html";
+      }
     });
+
     this.app.btnUserProfile.addEventListener("click", () => {
-      this.openModalSection(this.app.currentUser ? "account" : "auth");
+      window.location.href = this.app.currentUser
+        ? "settings.html"
+        : "login.html";
     });
+
     this.app.menuBtnAccount.addEventListener("click", () => {
-      this.openModalSection(this.app.currentUser ? "account" : "auth");
+      window.location.href = this.app.currentUser
+        ? "settings.html"
+        : "login.html";
     });
+
     this.app.menuBtnFeeds.addEventListener("click", () => {
-      if (this.app.currentUser) this.openModalSection("feeds");
+      if (this.app.currentUser) {
+        window.location.href = "settings.html#locations";
+      } else {
+        window.location.href = "login.html?redirect=settings.html";
+      }
     });
 
     this.app.menuBtnLogout.addEventListener("click", async () => {
@@ -211,127 +168,11 @@ export class AuthController {
       }
       this.app.authToken = null;
       this.app.currentUser = null;
+      this.app.customLocations = [];
       localStorage.removeItem("soc_auth_token");
+      localStorage.removeItem("soc_custom_locations");
       this.updateUserHeaderUI();
-      this.app.userModalBackdrop.style.display = "none";
-    });
-
-    this.app.btnCloseModal.addEventListener("click", () => {
-      this.app.userModalBackdrop.style.display = "none";
-    });
-    this.app.userModalBackdrop.addEventListener("click", (e) => {
-      if (e.target === this.app.userModalBackdrop)
-        this.app.userModalBackdrop.style.display = "none";
-    });
-
-    this.app.tabLogin.addEventListener("click", () => {
-      this.app.authMode = "login";
-      this.app.tabLogin.classList.add("active");
-      this.app.tabRegister.classList.remove("active");
-      this.app.registerAvatarGroup.style.display = "none";
-      this.app.btnAuthSubmit.textContent = "AUTHENTICATE";
-      this.app.authError.style.display = "none";
-    });
-
-    this.app.tabRegister.addEventListener("click", () => {
-      this.app.authMode = "register";
-      this.app.tabRegister.classList.add("active");
-      this.app.tabLogin.classList.remove("active");
-      this.app.registerAvatarGroup.style.display = "flex";
-      this.app.btnAuthSubmit.textContent = "REGISTER OPERATOR";
-      this.app.authError.style.display = "none";
-    });
-
-    this.app.regAvatarInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      this.app.pendingRegAvatar = await fileToDataUrl(file);
-      this.app.regAvatarPreview.src = this.app.pendingRegAvatar;
-      this.app.regAvatarPreview.style.display = "block";
-      this.app.regAvatarPlaceholder.style.display = "none";
-    });
-
-    this.app.authForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      this.app.authError.style.display = "none";
-
-      const endpoint =
-        this.app.authMode === "register" ? "/api/register" : "/api/login";
-      const payload = {
-        username: this.app.authUsername.value.trim(),
-        password: this.app.authPassword.value,
-        avatar: this.app.authMode === "register" ? this.app.pendingRegAvatar : "",
-      };
-
-      try {
-        const res = await fetch(`${CONFIG.apiBase}${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          this.app.authError.textContent =
-            data.detail || "Authentication failed.";
-          this.app.authError.style.display = "block";
-          return;
-        }
-
-        this.app.authToken = data.token;
-        this.app.currentUser = data.user;
-        localStorage.setItem("soc_auth_token", this.app.authToken);
-        this.app.authForm.reset();
-        this.updateUserHeaderUI();
-        this.app.userModalBackdrop.style.display = "none";
-      } catch {
-        this.app.authError.textContent =
-          "Unable to reach authentication server.";
-        this.app.authError.style.display = "block";
-      }
-    });
-
-    this.app.profileAvatarInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file || !this.app.authToken) return;
-      const dataUrl = await fileToDataUrl(file);
-      const res = await fetch(`${CONFIG.apiBase}/api/profile/avatar`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.app.authToken}`,
-        },
-        body: JSON.stringify({ avatar: dataUrl }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        this.app.currentUser = data.user;
-        this.updateUserHeaderUI();
-      }
-    });
-
-    this.app.btnAddSource.addEventListener("click", async () => {
-      if (!this.app.currentUser) return;
-      const name = this.app.sourceNameInput.value.trim();
-      const url = this.app.sourceUrlInput.value.trim();
-      if (!name || !url) return;
-
-      const updated = [
-        ...(this.app.currentUser.custom_sources || []),
-        { name, url },
-      ];
-      await this.saveCustomSources(updated);
-      this.app.sourceNameInput.value = "";
-      this.app.sourceUrlInput.value = "";
-    });
-
-    this.app.customSourcesList.addEventListener("click", async (e) => {
-      const btn = e.target.closest(".source-del-btn");
-      if (!btn || !this.app.currentUser) return;
-      const idx = parseInt(btn.dataset.idx, 10);
-      const updated = (this.app.currentUser.custom_sources || []).filter(
-        (_, i) => i !== idx
-      );
-      await this.saveCustomSources(updated);
+      this.app.renderPinnedNodesLegend();
     });
   }
 }
